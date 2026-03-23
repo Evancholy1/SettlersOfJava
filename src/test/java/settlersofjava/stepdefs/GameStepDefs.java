@@ -1,4 +1,4 @@
-package settlersofjava;
+package settlersofjava.stepdefs;
 
 import io.cucumber.java.en.*;
 import settlersofjava.engine.*;
@@ -9,9 +9,14 @@ public class GameStepDefs {
 
     private CatanGame game;
 
+    @io.cucumber.java.Before
+    public void resetGame() {
+        CatanGame.resetInstance();
+    }
+
     @Given("a new game is started")
     public void a_new_game_is_started() {
-        game = CatanGame.getInstance();
+        game = CatanGame.getInstance("Evan", "Danny");
     }
 
     @When("the dice are rolled and show {int}")

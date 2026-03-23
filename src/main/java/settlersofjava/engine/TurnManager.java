@@ -39,5 +39,9 @@ public class TurnManager {
     }
 
     public int getCurrentPlayerIndex() { return currentPlayerIndex; }
+
+    public GamePhase getPhase(){
+        return this.phase;
+    }
 }
 

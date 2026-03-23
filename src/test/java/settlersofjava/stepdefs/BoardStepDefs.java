@@ -1,4 +1,4 @@
-package settlersofjava;
+package settlersofjava.stepdefs;
 
 import io.cucumber.java.en.*;
 import settlersofjava.board.*;
