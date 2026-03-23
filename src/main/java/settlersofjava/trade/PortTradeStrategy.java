@@ -23,8 +23,8 @@ public class PortTradeStrategy implements TradeStrategy {
             case GENERIC_3_1 -> 3;
             case WOOD_2_1  -> offered == ResourceType.WOOD  ? 2 : 4;
             case BRICK_2_1 -> offered == ResourceType.BRICK ? 2 : 4;
-            case WOOL_2_1  -> offered == ResourceType.WOOL  ? 2 : 4;
-            case GRAIN_2_1 -> offered == ResourceType.GRAIN ? 2 : 4;
+            case WOOL_2_1  -> offered == ResourceType.SHEEP  ? 2 : 4;
+            case GRAIN_2_1 -> offered == ResourceType.WHEAT ? 2 : 4;
             case ORE_2_1   -> offered == ResourceType.ORE   ? 2 : 4;
         };
     }

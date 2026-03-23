@@ -14,7 +14,7 @@ public class City extends Buildable {
 
     public static final ResourceBundle COST = new ResourceBundle(Map.of(
         ResourceType.ORE,   3,
-        ResourceType.GRAIN, 2
+        ResourceType.WHEAT, 2
     ));
 
     public City(Player owner) {

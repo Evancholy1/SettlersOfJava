@@ -1,8 +1,9 @@
-package settlersofjava.stepdefs;
+package settlersofjava;
 
 import io.cucumber.java.en.*;
-import com.settlersofcava.player.*;
-import com.settlersofcava.resources.*;
+import settlersofjava.buildings.Settlement;
+import settlersofjava.player.*;
+import settlersofjava.resources.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 public class PlayerStepDefs {
@@ -25,5 +26,23 @@ public class PlayerStepDefs {
         ResourceType type = ResourceType.valueOf(resourceName.toUpperCase());
         assertEquals(expected, player.getResource(type));
     }
+
+    @Then("the player cannot afford a settlement")
+    public void the_player_cannot_afford_a_settlement() {
+        assertFalse(player.canAfford(Settlement.COST));
+    }
+
+    @Then("the player can afford a settlement")
+    public void the_player_can_afford_a_settlement() {
+        assertTrue(player.canAfford(Settlement.COST));
+    }
+
+    @Then("removing {int} {word} throws an error")
+    public void removing_throws_an_error(int amount, String resourceName) {
+        ResourceType type = ResourceType.valueOf(resourceName.toUpperCase());
+        assertThrows(IllegalStateException.class, () -> player.removeResource(type, amount));
+    }
+
+
 }
 

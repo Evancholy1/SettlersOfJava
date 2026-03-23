@@ -3,10 +3,10 @@ package settlersofjava.board;
 
 import java.util.*;
 
-import com.settlersofjava.board.Edge;
-import com.settlersofjava.board.HexCoordinate;
-import com.settlersofjava.board.TileFactory;
-import com.settlersofjava.board.BoardState;
+import settlersofjava.board.Edge;
+import settlersofjava.board.HexCoordinate;
+import settlersofjava.board.TileFactory;
+import settlersofjava.board.BoardState;
 
 /**
  * PATTERN: Builder

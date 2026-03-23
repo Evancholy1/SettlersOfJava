@@ -1,7 +1,7 @@
 package settlersofjava.player;
 
-import com.settlersofjava.resources.ResourceBundle;
-import com.settlersofjava.resources.ResourceType;
+import settlersofjava.resources.ResourceBundle;
+import settlersofjava.resources.ResourceType;
 import javafx.beans.property.IntegerProperty;
 import javafx.beans.property.SimpleIntegerProperty;
 import javafx.collections.FXCollections;
@@ -71,7 +71,9 @@ public class Player {
 
     public IntegerProperty victoryPointsProperty() { return victoryPoints; }
     public int getVictoryPoints()                  { return victoryPoints.get(); }
-    public void addVictoryPoints(int victoryPoints)        { victoryPoints.set(victoryPoints.get() + victoryPoints); }
+    public void addVictoryPoints(int delta) {
+        victoryPoints.set(victoryPoints.get() + delta);
+    }
 
     public IntegerProperty armySizeProperty()      { return armySize; }
     public int getArmySize()                       { return armySize.get(); }

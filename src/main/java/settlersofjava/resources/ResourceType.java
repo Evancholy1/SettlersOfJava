@@ -6,8 +6,8 @@ package settlersofjava.resources;
 public enum ResourceType {
     WOOD,
     BRICK,
-    WOOL,
-    GRAIN,
+    SHEEP,
+    WHEAT,
     ORE
 }
 

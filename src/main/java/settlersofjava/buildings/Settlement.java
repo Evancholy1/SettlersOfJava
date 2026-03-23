@@ -15,8 +15,8 @@ public class Settlement extends Buildable {
     public static final ResourceBundle COST = new ResourceBundle(Map.of(
         ResourceType.WOOD,  1,
         ResourceType.BRICK, 1,
-        ResourceType.WOOL,  1,
-        ResourceType.GRAIN, 1
+        ResourceType.SHEEP,  1,
+        ResourceType.WHEAT, 1
     ));
 
     public Settlement(Player owner) {

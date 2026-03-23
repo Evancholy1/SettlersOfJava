@@ -1,5 +1,6 @@
 package settlersofjava.ui;
 
+import javafx.collections.MapChangeListener;
 import settlersofjava.player.Player;
 import settlersofjava.resources.ResourceType;
 import javafx.scene.control.Label;
@@ -20,8 +21,8 @@ public class ResourcePanelView extends GridPane {
             Label countLabel = new Label();
 
             // OBSERVER binding: countLabel text auto-updates when resource map changes
-            player.resourcesProperty().addListener((obs, oldMap, newMap) ->
-                countLabel.setText(String.valueOf(player.getResource(type)))
+            player.resourcesProperty().addListener((MapChangeListener<ResourceType, Integer>) change ->
+                    countLabel.setText(String.valueOf(player.getResource(type)))
             );
             countLabel.setText(String.valueOf(player.getResource(type)));
 

@@ -1,7 +1,7 @@
-package settlersofjava.stepdefs;
+package settlersofjava;
 
 import io.cucumber.java.en.*;
-import com.settlersofcava.board.*;
+import settlersofjava.board.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 public class BoardStepDefs {

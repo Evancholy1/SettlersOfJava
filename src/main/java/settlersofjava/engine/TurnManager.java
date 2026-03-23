@@ -37,5 +37,7 @@ public class TurnManager {
         currentPlayerIndex = (currentPlayerIndex + 1) % playerList.size();
         phase = GamePhase.ROLL;
     }
+
+    public int getCurrentPlayerIndex() { return currentPlayerIndex; }
 }
 

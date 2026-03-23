@@ -17,7 +17,7 @@ public class Vertex {
         this.building = null;
     }
 
-    public int getId() { return idow; }
+    public int getId() { return id; }
 
     public boolean isOccupied() { return building != null; }
 
