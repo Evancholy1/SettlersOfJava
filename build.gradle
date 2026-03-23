@@ -3,7 +3,7 @@ plugins {
     id 'org.openjfx.javafxplugin' version '0.1.0'
 }
 
-group   = 'com.settlersofcava'
+group   = 'settlersofjava'
 version = '1.0-SNAPSHOT'
 
 java {
@@ -13,7 +13,7 @@ java {
 }
 
 application {
-    mainClass = 'com.settlersofcava.SettlersApp'
+    mainClass = 'settlersofjava.SettlersApp'
 }
 
 javafx {
