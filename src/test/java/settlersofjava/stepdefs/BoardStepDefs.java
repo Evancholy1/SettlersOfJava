@@ -11,11 +11,10 @@ public class BoardStepDefs {
     @Given("a standard Catan board is constructed")
     public void a_standard_board_is_constructed() {
         boardState = new BoardBuilder()
-            .withStandardTiles()
-            .withNumberTokens()
-            .withPorts()
-            .withVerticesAndEdges()
-            .build();
+                .withStandardTiles()
+                .withNumberTokens()
+                .withVerticesAndEdges()
+                .build();
     }
 
     @Then("the board has {int} tiles")

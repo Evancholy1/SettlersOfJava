@@ -30,9 +30,44 @@ public class BoardBuilder {
 
     private final TileFactory tileFactory = new TileFactory();
 
+    private static final List<TerrainType> STANDARD_TERRAINS = List.of(
+            TerrainType.MOUNTAINS, TerrainType.PASTURE,  TerrainType.FOREST,
+            TerrainType.FIELDS,    TerrainType.HILLS,    TerrainType.PASTURE,
+            TerrainType.HILLS,     TerrainType.FIELDS,   TerrainType.FOREST,
+            TerrainType.DESERT,
+            TerrainType.FOREST,    TerrainType.MOUNTAINS,TerrainType.FOREST,
+            TerrainType.MOUNTAINS, TerrainType.FIELDS,   TerrainType.PASTURE,
+            TerrainType.HILLS,     TerrainType.FIELDS,   TerrainType.PASTURE
+    );
+
+    private static final List<Integer> STANDARD_TOKENS = List.of(
+            10, 2, 9, 12, 6, 4, 10, 9, 11, 3, 8, 8, 3, 4, 5, 5, 6, 11
+    );
+
+    private static final List<HexCoordinate> STANDARD_COORDS = List.of(
+            new HexCoordinate( 0,  0),
+            new HexCoordinate( 1,  0), new HexCoordinate( 0,  1),
+            new HexCoordinate(-1,  1), new HexCoordinate(-1,  0),
+            new HexCoordinate( 0, -1), new HexCoordinate( 1, -1),
+            new HexCoordinate( 2,  0), new HexCoordinate( 1,  1),
+            new HexCoordinate( 0,  2), new HexCoordinate(-1,  2),
+            new HexCoordinate(-2,  1), new HexCoordinate(-2,  0),
+            new HexCoordinate(-1, -1), new HexCoordinate( 0, -2),
+            new HexCoordinate( 1, -2), new HexCoordinate( 2, -1),
+            new HexCoordinate( 2, -2), new HexCoordinate(-2,  2)
+    );
+
     public BoardBuilder withStandardTiles() {
-        // TODO: place 19 HexTiles at standard axial coordinates,
-        //       using TileFactory to create ResourceTile / DesertTile
+        int tokenIndex = 0;
+        for (int i = 0; i < STANDARD_COORDS.size(); i++) {
+            HexCoordinate coord = STANDARD_COORDS.get(i);
+            TerrainType terrain = STANDARD_TERRAINS.get(i);
+            if (terrain == TerrainType.DESERT) {
+                tiles.add(tileFactory.createDesertTile(coord));
+            } else {
+                tiles.add(tileFactory.createResourceTile(coord, terrain, STANDARD_TOKENS.get(tokenIndex++)));
+            }
+        }
         return this;
     }
 
@@ -48,13 +83,60 @@ public class BoardBuilder {
     }
 
     public BoardBuilder withVerticesAndEdges() {
-        // TODO: create 54 Vertex objects and 72 Edge objects,
-        //       wire tileToVertices map
+        Map<String, Vertex> vertexMap = new HashMap<>();
+        Map<String, Edge> edgeMap = new HashMap<>();
+        int[] vertexId = {0};
+        int[] edgeId = {0};
+
+        // For each tile, compute its 6 vertices using neighbor tile coordinates
+        // A vertex is uniquely identified by the set of 3 tiles that share it
+        for (HexTile tile : tiles) {
+            int q = tile.getCoordinate().getQ();
+            int r = tile.getCoordinate().getR();
+
+            // 6 neighbor directions in axial coordinates
+            int[][] dirs = {{1,0},{1,-1},{0,-1},{-1,0},{-1,1},{0,1}};
+
+            List<String> vertexKeys = new ArrayList<>();
+            for (int i = 0; i < 6; i++) {
+                // Each vertex is shared by this tile and its two adjacent neighbors
+                int[] d1 = dirs[i];
+                int[] d2 = dirs[(i + 1) % 6];
+                // Sort the three tile coords to make a canonical key
+                int[][] three = {
+                        {q, r},
+                        {q + d1[0], r + d1[1]},
+                        {q + d2[0], r + d2[1]}
+                };
+                Arrays.sort(three, (a, b) -> a[0] != b[0] ? a[0] - b[0] : a[1] - b[1]);
+                String key = three[0][0]+","+three[0][1]+"|"+
+                        three[1][0]+","+three[1][1]+"|"+
+                        three[2][0]+","+three[2][1];
+                vertexMap.computeIfAbsent(key, k -> new Vertex(vertexId[0]++));
+                vertexKeys.add(key);
+            }
+
+            // Store vertices for this tile
+            List<Vertex> tileVerts = new ArrayList<>();
+            for (String k : vertexKeys) tileVerts.add(vertexMap.get(k));
+            tileToVertices.put(tile.getCoordinate(), tileVerts);
+
+            // Create edges between adjacent vertices
+            for (int i = 0; i < 6; i++) {
+                String ka = vertexKeys.get(i);
+                String kb = vertexKeys.get((i + 1) % 6);
+                String edgeKey = ka.compareTo(kb) < 0 ? ka+"||"+kb : kb+"||"+ka;
+                edgeMap.computeIfAbsent(edgeKey, k ->
+                        new Edge(edgeId[0]++, vertexMap.get(ka), vertexMap.get(kb)));
+            }
+        }
+
+        vertices.addAll(vertexMap.values());
+        edges.addAll(edgeMap.values());
         return this;
     }
 
     public BoardState build() {
-        // TODO: validate board is complete before constructing
         return new BoardState(tiles, vertices, edges, tileToVertices);
     }
 }

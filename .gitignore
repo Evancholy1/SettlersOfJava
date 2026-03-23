@@ -3,3 +3,7 @@ build/
 .idea/
 *.iml
 out/
+*.bin
+*.lock
+*.probe
+problems-report.html
