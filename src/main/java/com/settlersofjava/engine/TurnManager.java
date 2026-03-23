@@ -19,18 +19,23 @@ public class TurnManager {
     }
 
     public Player getCurrentPlayer() {
-        // TODO: return playerList.get(currentPlayerIndex)
-        throw new UnsupportedOperationException("Not yet implemented");
+       return playerList.get(currentPlayerIndex);
     }
 
     public void advancePhase() {
-        // TODO: transition phase state machine
-        throw new UnsupportedOperationException("Not yet implemented");
+        phase = switch (phase) {
+            case SETUP    -> GamePhase.ROLL;
+            case ROLL     -> GamePhase.TRADE;
+            case TRADE    -> GamePhase.BUILD;
+            case BUILD    -> GamePhase.END_TURN;
+            case END_TURN -> GamePhase.ROLL;
+            case GAME_OVER -> GamePhase.GAME_OVER;
+        };
     }
 
     public void endTurn() {
-        // TODO: advance to next player, reset to ROLL phase
-        throw new UnsupportedOperationException("Not yet implemented");
+        currentPlayerIndex = (currentPlayerIndex + 1) % playerList.size();
+        phase = GamePhase.ROLL;
     }
 }
 

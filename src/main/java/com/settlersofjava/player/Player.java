@@ -1,11 +1,12 @@
 package com.settlersofcava.player;
 
-import com.settlersofcava.resources.ResourceType;
+import com.settlersofjava.resources.ResourceBundle;
+import com.settlersofjava.resources.ResourceType;
 import javafx.beans.property.IntegerProperty;
 import javafx.beans.property.SimpleIntegerProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableMap;
-
+import java.util.Map;
 /**
  * PATTERN: Observer (via JavaFX Properties)
  * A player's state is exposed via JavaFX observable properties so that
@@ -19,7 +20,7 @@ public class Player {
     private final String name;
     private final PlayerColor color;
 
-    // OBSERVER: UI binds to these — changes propagate automatically
+    // OBSERVER: UI binds to these changes update automatically
     private final ObservableMap<ResourceType, Integer> resources;
     private final IntegerProperty victoryPoints;
     private final IntegerProperty armySize;
@@ -55,9 +56,13 @@ public class Player {
         resources.put(type, current - amount);
     }
 
-    public boolean canAfford(com.settlersofcava.resources.ResourceBundle cost) {
-        // TODO: check if player has enough of each resource in cost
-        throw new UnsupportedOperationException("Not yet implemented");
+    public boolean canAfford(ResourceBundle cost) {
+        for (Map.Entry<ResourceType, Integer> entry : cost.toMap().entrySet()) {
+            if (getResource(entry.getKey()) < entry.getValue()) {
+                return false;
+            }
+        }
+        return true;
     }
 
     // ── Observable property accessors (for JavaFX binding) ───────────────────
@@ -66,7 +71,7 @@ public class Player {
 
     public IntegerProperty victoryPointsProperty() { return victoryPoints; }
     public int getVictoryPoints()                  { return victoryPoints.get(); }
-    public void addVictoryPoints(int delta)        { victoryPoints.set(victoryPoints.get() + delta); }
+    public void addVictoryPoints(int victoryPoints)        { victoryPoints.set(victoryPoints.get() + victoryPoints); }
 
     public IntegerProperty armySizeProperty()      { return armySize; }
     public int getArmySize()                       { return armySize.get(); }

@@ -22,8 +22,10 @@ public class PlayerList {
     public List<Player> getAll()       { return players; }
 
     public Player getWinner() {
-        // TODO: return player with >= 10 VPs, or null if no winner yet
-        throw new UnsupportedOperationException("Not yet implemented");
+        return players.stream()
+                .filter(p -> p.getVictoryPoints() >= 10)
+                .findFirst()
+                .orElse(null);
     }
 }
 

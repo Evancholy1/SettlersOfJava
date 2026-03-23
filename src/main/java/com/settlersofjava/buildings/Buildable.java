@@ -1,4 +1,4 @@
-package com.settlersofcava.buildings;
+package com.settlersofjava.buildings;
 
 import com.settlersofcava.player.Player;
 import com.settlersofcava.resources.ResourceBundle;
