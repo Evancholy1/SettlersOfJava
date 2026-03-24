@@ -17,7 +17,7 @@ public class SettlersApp extends Application {
     public void start(Stage primaryStage) {
         // TODO: load main.fxml, inject BoardState + PlayerList into GameController
         BoardState boardState = new BoardBuilder()
-                .withShuffledTiles()
+                .withShuffledTilesAndNumberTokens()
                 .withVerticesAndEdges()
                 .build();
         BoardView boardView = new BoardView(boardState);

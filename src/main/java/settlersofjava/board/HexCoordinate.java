@@ -17,13 +17,24 @@ public class HexCoordinate {
         this.r = r;
     }
 
+    private static final int[][] DIRECTIONS = {
+            {1, 0}, //  0: EAST
+            {1, -1}, // 1: NORTH EAST
+            {0, -1}, // 2: NORTH WEST
+            {-1, 0}, // 3: WEST
+            {-1, 1}, // 4: SOUTH WEST
+            {0, 1}, //  5: SOUTH EAST
+    };
+
     public int getQ() { return q; }
     public int getR() { return r; }
     public int getS() { return -q - r; }
 
     public HexCoordinate neighbor(int direction) {
-        // TODO: return the neighboring coordinate in one of 6 directions
-        throw new UnsupportedOperationException("Not yet implemented");
+        if(direction < 0 || direction > 5) {
+            throw new IllegalArgumentException("Invalid direction: " + direction + ". Direction must be between 0 and 5");
+        }
+        return new HexCoordinate(q + DIRECTIONS[direction][0], r + DIRECTIONS[direction][1]);
     }
 
     @Override

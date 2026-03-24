@@ -6,12 +6,9 @@ package settlersofjava.board;
  * Subclasses: ResourceTile, DesertTile
  */
 
-
-
-
 public abstract class HexTile {
 
-    protected final settlersofjava.board.HexCoordinate coordinate;
+    protected final HexCoordinate coordinate;
     protected final TerrainType terrainType;
 
     protected HexTile(HexCoordinate coordinate, TerrainType terrainType) {
@@ -19,7 +16,7 @@ public abstract class HexTile {
         this.terrainType = terrainType;
     }
 
-    public settlersofjava.board.HexCoordinate getCoordinate() { return coordinate; }
+    public HexCoordinate getCoordinate() { return coordinate; }
     public TerrainType getTerrainType()  { return terrainType; }
 
 

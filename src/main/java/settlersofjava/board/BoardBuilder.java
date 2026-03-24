@@ -11,7 +11,7 @@ import java.util.*;
  *
  * Usage:
  *   BoardState board = new BoardBuilder()
- *       .withShuffledTiles()
+ *       .withShuffledTilesAndNumberTokens()
  *       .withNumberTokens()
  *       .withPorts()
  *       .build();
@@ -52,8 +52,7 @@ public class BoardBuilder {
             new HexCoordinate( 2, -2), new HexCoordinate(-2,  2)
     );
 
-    public BoardBuilder withShuffledTiles() {
-        // mutable copy for shuffle
+    public BoardBuilder withShuffledTilesAndNumberTokens() {
         List<TerrainType> shuffledTerrains = new ArrayList<>(STANDARD_TERRAINS);
         Collections.shuffle(shuffledTerrains);
         List<Integer> shuffledTokens = new ArrayList<>(STANDARD_TOKENS);
@@ -69,11 +68,6 @@ public class BoardBuilder {
                 tiles.add(tileFactory.createResourceTile(coord, terrain, shuffledTokens.get(tokenIndex++)));
             }
         }
-        return this;
-    }
-
-    public BoardBuilder withNumberTokens() {
-        // TODO: assign the standard Catan number token sequence to ResourceTiles
         return this;
     }
 
