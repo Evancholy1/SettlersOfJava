@@ -1,6 +1,8 @@
 package settlersofjava.stepdefs;
 
 import io.cucumber.java.en.*;
+import settlersofjava.FixedDie;
+import settlersofjava.dice.Die;
 import settlersofjava.engine.*;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -21,8 +23,9 @@ public class GameStepDefs {
 
     @When("the dice are rolled and show {int}")
     public void the_dice_show(int total) {
-        // TODO: inject a fixed Die that returns this total
-        throw new UnsupportedOperationException("Not yet implemented");
+        Die fixedDie = new FixedDie(total);
+        int rollResult = fixedDie.roll();
+        assertEquals(total, rollResult);
     }
 
     @Then("the current phase is {string}")
