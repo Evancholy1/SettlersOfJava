@@ -3,11 +3,6 @@ package settlersofjava.board;
 
 import java.util.*;
 
-import settlersofjava.board.Edge;
-import settlersofjava.board.HexCoordinate;
-import settlersofjava.board.TileFactory;
-import settlersofjava.board.BoardState;
-
 /**
  * PATTERN: Builder
  * Constructs a BoardState step by step.
@@ -16,7 +11,7 @@ import settlersofjava.board.BoardState;
  *
  * Usage:
  *   BoardState board = new BoardBuilder()
- *       .withStandardTiles()
+ *       .withShuffledTiles()
  *       .withNumberTokens()
  *       .withPorts()
  *       .build();
@@ -41,7 +36,7 @@ public class BoardBuilder {
     );
 
     private static final List<Integer> STANDARD_TOKENS = List.of(
-            10, 2, 9, 12, 6, 4, 10, 9, 11, 3, 8, 8, 3, 4, 5, 5, 6, 11
+            2, 3, 3, 4, 4, 5, 5, 6, 6, 8, 8, 9, 9, 10, 10, 11, 11, 12
     );
 
     private static final List<HexCoordinate> STANDARD_COORDS = List.of(
@@ -57,15 +52,21 @@ public class BoardBuilder {
             new HexCoordinate( 2, -2), new HexCoordinate(-2,  2)
     );
 
-    public BoardBuilder withStandardTiles() {
+    public BoardBuilder withShuffledTiles() {
+        // mutable copy for shuffle
+        List<TerrainType> shuffledTerrains = new ArrayList<>(STANDARD_TERRAINS);
+        Collections.shuffle(shuffledTerrains);
+        List<Integer> shuffledTokens = new ArrayList<>(STANDARD_TOKENS);
+        Collections.shuffle(shuffledTokens);
+
         int tokenIndex = 0;
         for (int i = 0; i < STANDARD_COORDS.size(); i++) {
             HexCoordinate coord = STANDARD_COORDS.get(i);
-            TerrainType terrain = STANDARD_TERRAINS.get(i);
+            TerrainType terrain = shuffledTerrains.get(i);
             if (terrain == TerrainType.DESERT) {
                 tiles.add(tileFactory.createDesertTile(coord));
             } else {
-                tiles.add(tileFactory.createResourceTile(coord, terrain, STANDARD_TOKENS.get(tokenIndex++)));
+                tiles.add(tileFactory.createResourceTile(coord, terrain, shuffledTokens.get(tokenIndex++)));
             }
         }
         return this;

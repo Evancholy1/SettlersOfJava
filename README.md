@@ -9,3 +9,6 @@ Settlers of Java is a digital and object-oriented implementation of the board ga
 For a detailed breakdown of design patterns used:
 
 **[Read the Design Patterns Documentation](Patterns.MD)**
+
+## Run
+```./gradlew run```

@@ -11,7 +11,7 @@ public class BoardStepDefs {
     @Given("a standard Catan board is constructed")
     public void a_standard_board_is_constructed() {
         boardState = new BoardBuilder()
-                .withStandardTiles()
+                .withShuffledTiles()
                 .withNumberTokens()
                 .withVerticesAndEdges()
                 .build();
