@@ -5,6 +5,9 @@ import settlersofjava.FixedDie;
 import settlersofjava.dice.Die;
 import settlersofjava.engine.*;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 public class GameStepDefs {
@@ -18,7 +21,12 @@ public class GameStepDefs {
 
     @Given("a new game is started")
     public void a_new_game_is_started() {
-        game = CatanGame.getInstance("Evan", "Danny");
+        List<String> players = new ArrayList<>();
+        players.add("Evan");
+        players.add("Danny");
+        players.add("Jeremy");
+        players.add("Logan");
+        game = CatanGame.getInstance(players);
     }
 
     @When("the dice are rolled and show {int}")

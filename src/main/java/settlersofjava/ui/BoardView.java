@@ -22,8 +22,8 @@ public class BoardView extends Pane {
 
     private final BoardState boardState;
     private static final double HEX_SIZE = 50.0;
-    private static final double BOARD_CENTER_X = 400.0;
-    private static final double BOARD_CENTER_Y = 400.0;
+    private static final double BOARD_CENTER_X = 640.0;
+    private static final double BOARD_CENTER_Y = 360.0;
 
     public BoardView(BoardState boardState) {
         this.boardState = boardState;
