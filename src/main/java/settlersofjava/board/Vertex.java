@@ -11,10 +11,12 @@ public class Vertex {
 
     private final int id;
     private Buildable building; // null if unoccupied
+    private PortType port;      // null if not a port vertex
 
     public Vertex(int id) {
         this.id = id;
         this.building = null;
+        this.port = null;
     }
 
     public int getId() { return id; }
@@ -34,5 +36,9 @@ public class Vertex {
         // TODO: validate that upgraded is a City replacing a Settlement
         this.building = upgraded;
     }
+
+    public PortType getPort()        { return port; }
+    public void setPort(PortType p)  { this.port = p; }
+    public boolean hasPort()         { return port != null; }
 }
 

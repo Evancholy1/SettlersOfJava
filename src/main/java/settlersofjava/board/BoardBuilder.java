@@ -2,6 +2,7 @@ package settlersofjava.board;
 
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * PATTERN: Builder
@@ -72,8 +73,64 @@ public class BoardBuilder {
     }
 
     public BoardBuilder withPorts() {
-        // TODO: place 9 ports (1 generic 3:1, 5 specific 2:1, 3 generic 3:1)
-        //       around the board edge
+        // Count how many tiles each vertex touches (coastal < 3, interior == 3)
+        Map<Integer, Integer> vertexTileCount = new HashMap<>();
+        for (List<Vertex> verts : tileToVertices.values()) {
+            for (Vertex v : verts) {
+                vertexTileCount.merge(v.getId(), 1, Integer::sum);
+            }
+        }
+
+        // Compute vertex positions in tile-unit coordinates (same math as BoardView, no scale)
+        Map<Integer, double[]> vPos = new HashMap<>();
+        for (HexTile tile : tiles) {
+            int q = tile.getCoordinate().getQ();
+            int r = tile.getCoordinate().getR();
+            double cx = Math.sqrt(3) * (q + r / 2.0);
+            double cy = 1.5 * r;
+            List<Vertex> verts = tileToVertices.get(tile.getCoordinate());
+            if (verts == null) continue;
+            for (int i = 0; i < verts.size(); i++) {
+                double angle = Math.toRadians(-60 * i - 30);
+                int id = verts.get(i).getId();
+                vPos.putIfAbsent(id, new double[]{cx + Math.cos(angle), cy + Math.sin(angle)});
+            }
+        }
+
+        // Coastal edges: both endpoints touch fewer than 3 tiles
+        List<Edge> coastal = edges.stream()
+                .filter(e -> vertexTileCount.getOrDefault(e.getVertexA().getId(), 0) < 3
+                          && vertexTileCount.getOrDefault(e.getVertexB().getId(), 0) < 3)
+                .collect(Collectors.toList());
+
+        // Sort clockwise by midpoint angle from board center (0,0 in tile-unit coords)
+        coastal.sort(Comparator.comparingDouble(e -> {
+            double[] a = vPos.get(e.getVertexA().getId());
+            double[] b = vPos.get(e.getVertexB().getId());
+            if (a == null || b == null) return 0.0;
+            double mx = (a[0] + b[0]) / 2.0;
+            double my = (a[1] + b[1]) / 2.0;
+            double angle = Math.atan2(my, mx); // -π to π
+            return angle < 0 ? angle + 2 * Math.PI : angle;
+        }));
+
+        // 9 ports: 4 generic 3:1 + one of each resource 2:1, shuffled
+        List<PortType> portTypes = new ArrayList<>(List.of(
+                PortType.GENERIC_3_1, PortType.GENERIC_3_1, PortType.GENERIC_3_1, PortType.GENERIC_3_1,
+                PortType.WOOD_2_1, PortType.BRICK_2_1, PortType.WOOL_2_1, PortType.GRAIN_2_1, PortType.ORE_2_1
+        ));
+        Collections.shuffle(portTypes);
+
+        // Place ports at 9 evenly-spaced positions around the coastal ring
+        int total = coastal.size();
+        for (int i = 0; i < 9; i++) {
+            int idx = ((int) Math.round((double) i * total / 9.0)) % total;
+            Edge portEdge = coastal.get(idx);
+            PortType type = portTypes.get(i);
+            portEdge.getVertexA().setPort(type);
+            portEdge.getVertexB().setPort(type);
+        }
+
         return this;
     }
 
@@ -132,7 +189,14 @@ public class BoardBuilder {
     }
 
     public BoardState build() {
-        return new BoardState(tiles, vertices, edges, tileToVertices);
+        // Derive the reverse map: vertex -> tiles that touch it (up to 3)
+        Map<Vertex, List<HexTile>> vertexToTiles = new HashMap<>();
+        for (HexTile tile : tiles) {
+            for (Vertex v : tileToVertices.getOrDefault(tile.getCoordinate(), List.of())) {
+                vertexToTiles.computeIfAbsent(v, k -> new ArrayList<>()).add(tile);
+            }
+        }
+        return new BoardState(tiles, vertices, edges, tileToVertices, vertexToTiles);
     }
 }
 

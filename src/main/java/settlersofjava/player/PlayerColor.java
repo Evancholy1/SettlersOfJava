@@ -6,7 +6,7 @@ package settlersofjava.player;
 public enum PlayerColor {
     RED,
     BLUE,
-    WHITE,
+    BLACK,
     ORANGE
 }
 

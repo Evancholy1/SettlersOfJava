@@ -6,11 +6,14 @@ import javafx.scene.Scene;
 import settlersofjava.board.BoardBuilder;
 import settlersofjava.board.BoardState;
 import settlersofjava.ui.BoardView;
+import settlersofjava.ui.GameController;
+import settlersofjava.ui.PlayerDashboard;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
+import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.text.Font;
 import settlersofjava.engine.CatanGame;
@@ -77,12 +80,34 @@ public class SettlersApp extends Application {
             BoardState boardState = new BoardBuilder()
                     .withShuffledTilesAndNumberTokens()
                     .withVerticesAndEdges()
+                    .withPorts()
                     .build();
             game.setBoardState(boardState);
 
             BoardView boardView = new BoardView(boardState);
 
-            Scene gameScene = new Scene(boardView, windowSizeX, windowSizeY);
+            Label statusLabel = new Label();
+            statusLabel.setFont(new Font("System Bold", 16));
+            statusLabel.setPadding(new Insets(10, 20, 10, 20));
+
+            PlayerDashboard dashboard = new PlayerDashboard();
+
+            BorderPane gameLayout = new BorderPane();
+            gameLayout.setTop(statusLabel);
+            gameLayout.setCenter(boardView);
+            gameLayout.setBottom(dashboard);
+
+            GameController controller = new GameController(
+                    boardState,
+                    game.getPlayerList(),
+                    game.getTurnManager(),
+                    statusLabel::setText
+            );
+            controller.setBoardView(boardView);
+            controller.setPlayerDashboard(dashboard);
+            controller.startSetup();
+
+            Scene gameScene = new Scene(gameLayout, windowSizeX, windowSizeY);
             primaryStage.setScene(gameScene);
         });
 
