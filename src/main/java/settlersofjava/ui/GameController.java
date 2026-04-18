@@ -132,14 +132,7 @@ public class GameController implements GameEventListener {
     }
 
     private ResourceType terrainToResource(settlersofjava.board.TerrainType t) {
-        return switch (t) {
-            case FOREST    -> ResourceType.WOOD;
-            case PASTURE   -> ResourceType.SHEEP;
-            case FIELDS    -> ResourceType.WHEAT;
-            case HILLS     -> ResourceType.BRICK;
-            case MOUNTAINS -> ResourceType.ORE;
-            case DESERT    -> null;
-        };
+        return t.toResourceType();
     }
 
     // ── Highlight + status helpers ────────────────────────────────────────────

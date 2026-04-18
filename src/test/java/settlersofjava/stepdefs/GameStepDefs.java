@@ -8,7 +8,7 @@ import settlersofjava.engine.*;
 import java.util.ArrayList;
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.*;
 
 public class GameStepDefs {
 
@@ -50,6 +50,26 @@ public class GameStepDefs {
     @When("the turn ends")
     public void the_turn_ends() {
         game.getTurnManager().endTurn();
+    }
+
+    @When("a setup turn ends")
+    public void a_setup_turn_ends() {
+        game.getTurnManager().endSetupTurn();
+    }
+
+    @When("{int} setup turns end")
+    public void n_setup_turns_end(int n) {
+        for (int i = 0; i < n; i++) game.getTurnManager().endSetupTurn();
+    }
+
+    @Then("setup round 2 is active")
+    public void setup_round_2_is_active() {
+        assertTrue(game.getTurnManager().isSetupRound2());
+    }
+
+    @Then("setup round 2 is not active")
+    public void setup_round_2_is_not_active() {
+        assertFalse(game.getTurnManager().isSetupRound2());
     }
 
     @When("the phase is advanced from SETUP to ROLL")
