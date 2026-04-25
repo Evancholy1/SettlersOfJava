@@ -1,7 +1,13 @@
 package settlersofjava.ui;
 
+import javafx.animation.KeyFrame;
+import javafx.animation.KeyValue;
+import javafx.animation.PauseTransition;
+import javafx.animation.Timeline;
+import javafx.beans.property.SimpleDoubleProperty;
 import javafx.geometry.Pos;
 import javafx.scene.control.Label;
+import javafx.scene.effect.DropShadow;
 import javafx.scene.layout.Pane;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
@@ -11,23 +17,28 @@ import javafx.scene.shape.StrokeLineCap;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import javafx.scene.text.Text;
+import javafx.util.Duration;
 import settlersofjava.board.*;
+import settlersofjava.buildings.City;
+import settlersofjava.events.EventBus;
+import settlersofjava.events.GameEvent;
+import settlersofjava.events.GameEventListener;
 import settlersofjava.player.PlayerColor;
 
 import java.util.*;
 import java.util.function.Consumer;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Renders the hex board on a JavaFX Pane using absolute pixel coordinates.
  * Exposes click callbacks for vertices and edges, and accepts highlight sets
  * so GameController can drive valid-placement indicators.
  */
-public class BoardView extends Pane {
+public class BoardView extends Pane implements GameEventListener {
 
     private final BoardState boardState;
-    private static final double HEX_SIZE      = 55.0;
-    private static final double BOARD_CENTER_X = 640.0;
-    private static final double BOARD_CENTER_Y = 370.0;
+    private static final double HEX_SIZE = 55.0;
 
     /** vertexId → [screenX, screenY] */
     private final Map<Integer, double[]> vertexPos = new HashMap<>();
@@ -35,12 +46,46 @@ public class BoardView extends Pane {
     private Consumer<Vertex> onVertexClick;
     private Consumer<Edge>   onEdgeClick;
 
-    private Set<Vertex> highlightedVertices = new HashSet<>();
-    private Set<Edge>   highlightedEdges    = new HashSet<>();
+    private Set<Vertex>  highlightedVertices    = new HashSet<>();
+    private Set<Vertex>  highlightedCityUpgrades = new HashSet<>();
+    private Set<Edge>    highlightedEdges        = new HashSet<>();
+
+    // Live DropShadow objects on city-upgrade circles — animated in-place, no redraw needed
+    private final List<DropShadow> cityGlowEffects = new ArrayList<>();
+    private final SimpleDoubleProperty glowRadius  = new SimpleDoubleProperty(6.0);
+    private Timeline cityPulse;
+
+    private final Set<HexTile> flashedTiles = new HashSet<>();
+    private PauseTransition flashTimer;
 
     public BoardView(BoardState boardState) {
         this.boardState = boardState;
+        setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
+        EventBus.getInstance().register(this);
+        // Update existing glow effects in-place — avoids wiping nodes between animation ticks
+        glowRadius.addListener((obs, o, n) ->
+            cityGlowEffects.forEach(ds -> ds.setRadius(n.doubleValue())));
+        widthProperty().addListener((obs, o, n) -> drawBoard());
+        heightProperty().addListener((obs, o, n) -> drawBoard());
         drawBoard();
+    }
+
+    @Override
+    public void onEvent(GameEvent event, Object payload) {
+        if (event != GameEvent.DICE_ROLLED) return;
+        int[] roll  = (int[]) payload;
+        int   total = roll[0] + roll[1];
+
+        // Cancel any previous flash still in progress
+        if (flashTimer != null) flashTimer.stop();
+
+        flashedTiles.clear();
+        flashedTiles.addAll(boardState.getActiveTilesFor(total));
+        drawBoard();
+
+        flashTimer = new PauseTransition(Duration.seconds(1));
+        flashTimer.setOnFinished(e -> { flashedTiles.clear(); drawBoard(); });
+        flashTimer.play();
     }
 
     public void setOnVertexClick(Consumer<Vertex> handler) { this.onVertexClick = handler; }
@@ -56,6 +101,21 @@ public class BoardView extends Pane {
         drawBoard();
     }
 
+    public void setHighlightedCityUpgrades(Set<Vertex> vertices) {
+        this.highlightedCityUpgrades = vertices;
+        if (cityPulse != null) cityPulse.stop();
+        drawBoard(); // build nodes (and populate cityGlowEffects) once
+        if (!vertices.isEmpty()) {
+            cityPulse = new Timeline(
+                new KeyFrame(Duration.ZERO,       new KeyValue(glowRadius, 6.0)),
+                new KeyFrame(Duration.millis(650), new KeyValue(glowRadius, 22.0))
+            );
+            cityPulse.setAutoReverse(true);
+            cityPulse.setCycleCount(Timeline.INDEFINITE);
+            cityPulse.play();
+        }
+    }
+
     public void refresh() { drawBoard(); }
 
     // ── Drawing ───────────────────────────────────────────────────────────────
@@ -63,6 +123,7 @@ public class BoardView extends Pane {
     private void drawBoard() {
         getChildren().clear();
         vertexPos.clear();
+        cityGlowEffects.clear();
 
         // First pass: compute vertex pixel positions.
         // Vertex i in withVerticesAndEdges sits between dirs[i] and dirs[(i+1)%6].
@@ -93,7 +154,9 @@ public class BoardView extends Pane {
                     c[1] + HEX_SIZE * Math.sin(angle)
                 );
             }
-            hex.setFill(terrainColor(tile.getTerrainType()));
+            Color fill = terrainColor(tile.getTerrainType());
+            if (flashedTiles.contains(tile)) fill = fill.darker();
+            hex.setFill(fill);
             hex.setStroke(Color.BLACK);
             hex.setStrokeWidth(2.0);
             getChildren().add(hex);
@@ -134,17 +197,34 @@ public class BoardView extends Pane {
             }
         }
 
-        // Draw vertices (settlements or clickable highlights)
+        // Draw vertices (cities, settlements, or clickable highlights)
         for (Vertex v : boardState.getVertices()) {
             double[] pos = vertexPos.get(v.getId());
             if (pos == null) continue;
 
             if (v.isOccupied()) {
                 Color fill = playerColor(v.getBuilding().getOwner().getColor());
-                Circle c = new Circle(pos[0], pos[1], 11, fill);
-                c.setStroke(Color.BLACK);
-                c.setStrokeWidth(2);
-                getChildren().add(c);
+                boolean upgradeTarget = highlightedCityUpgrades.contains(v);
+                if (v.getBuilding() instanceof City) {
+                    drawDiamond(pos, fill, false, null);
+                } else if (upgradeTarget) {
+                    // Settlement eligible for city upgrade — glow is animated in-place via cityGlowEffects
+                    Circle c = new Circle(pos[0], pos[1], 11, fill);
+                    c.setStroke(Color.YELLOW);
+                    c.setStrokeWidth(3);
+                    DropShadow glow = new DropShadow(glowRadius.get(), Color.YELLOW);
+                    glow.setSpread(0.45);
+                    c.setEffect(glow);
+                    cityGlowEffects.add(glow); // Timeline updates this directly, no redraw needed
+                    final Vertex fv = v;
+                    c.setOnMouseClicked(ev -> { if (onVertexClick != null) onVertexClick.accept(fv); });
+                    getChildren().add(c);
+                } else {
+                    Circle c = new Circle(pos[0], pos[1], 11, fill);
+                    c.setStroke(Color.BLACK);
+                    c.setStrokeWidth(2);
+                    getChildren().add(c);
+                }
             } else if (highlightedVertices.contains(v)) {
                 Circle c = new Circle(pos[0], pos[1], 11, Color.LIGHTGREEN);
                 c.setStroke(Color.DARKGREEN);
@@ -155,6 +235,28 @@ public class BoardView extends Pane {
                 getChildren().add(c);
             }
         }
+    }
+
+    private void drawDiamond(double[] pos, Color fill, boolean glowing, Vertex v) {
+        double r = 13.0;
+        Polygon diamond = new Polygon(
+            pos[0],     pos[1] - r,
+            pos[0] + r, pos[1],
+            pos[0],     pos[1] + r,
+            pos[0] - r, pos[1]
+        );
+        diamond.setFill(fill);
+        diamond.setStroke(Color.BLACK);
+        diamond.setStrokeWidth(2);
+        if (glowing) {
+            DropShadow glow = new DropShadow(glowRadius.get(), Color.YELLOW);
+            glow.setSpread(0.45);
+            diamond.setEffect(glow);
+            diamond.setStroke(Color.YELLOW);
+            final Vertex fv = v;
+            diamond.setOnMouseClicked(ev -> { if (onVertexClick != null) onVertexClick.accept(fv); });
+        }
+        getChildren().add(diamond);
     }
 
     // ── Port rendering ───────────────────────────────────────────────────────
@@ -170,10 +272,12 @@ public class BoardView extends Pane {
             if (a == null || b == null) continue;
 
             // midpoint of the coastal edge, pushed outward from board center
+            double cx = getWidth()  > 0 ? getWidth()  / 2.0 : 640.0;
+            double cy = getHeight() > 0 ? getHeight() / 2.0 : 370.0;
             double mx = (a[0] + b[0]) / 2.0;
             double my = (a[1] + b[1]) / 2.0;
-            double dx = mx - BOARD_CENTER_X;
-            double dy = my - BOARD_CENTER_Y;
+            double dx = mx - cx;
+            double dy = my - cy;
             double len = Math.sqrt(dx * dx + dy * dy);
             double px = mx + dx / len * 32;
             double py = my + dy / len * 32;
@@ -234,9 +338,11 @@ public class BoardView extends Pane {
     private double[] tileCenter(HexTile tile) {
         int q = tile.getCoordinate().getQ();
         int r = tile.getCoordinate().getR();
+        double cx = getWidth()  > 0 ? getWidth()  / 2.0 : 640.0;
+        double cy = getHeight() > 0 ? getHeight() / 2.0 : 370.0;
         return new double[]{
-            HEX_SIZE * Math.sqrt(3) * (q + r / 2.0) + BOARD_CENTER_X,
-            HEX_SIZE * 1.5 * r + BOARD_CENTER_Y
+            HEX_SIZE * Math.sqrt(3) * (q + r / 2.0) + cx,
+            HEX_SIZE * 1.5 * r + cy
         };
     }
 

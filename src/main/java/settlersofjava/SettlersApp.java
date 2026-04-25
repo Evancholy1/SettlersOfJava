@@ -14,9 +14,12 @@ import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.text.Font;
 import settlersofjava.engine.CatanGame;
+import settlersofjava.ui.DiceView;
 
 import java.util.List;
 
@@ -37,6 +40,7 @@ public class SettlersApp extends Application {
         // Show Setup Screen
         primaryStage.setTitle("Settlers of Java");
         primaryStage.setScene(setupScene);
+        primaryStage.setMaximized(true);
         primaryStage.show();
     }
 
@@ -88,13 +92,39 @@ public class SettlersApp extends Application {
 
             Label statusLabel = new Label();
             statusLabel.setFont(new Font("System Bold", 16));
-            statusLabel.setPadding(new Insets(10, 20, 10, 20));
+
+            Button rollButton           = new Button("Roll Dice");
+            Button endTurnButton        = new Button("End Turn");
+            Button buildRoadButton      = new Button("Build Road");
+            Button buildSettlementButton = new Button("Build Settlement");
+            Button buildCityButton      = new Button("Upgrade to City");
+            rollButton.setFont(new Font(14));
+            endTurnButton.setFont(new Font(14));
+            buildRoadButton.setFont(new Font(14));
+            buildSettlementButton.setFont(new Font(14));
+            buildCityButton.setFont(new Font(14));
+
+            HBox topBar = new HBox(20, statusLabel, rollButton, endTurnButton);
+            topBar.setAlignment(Pos.CENTER_LEFT);
+            topBar.setPadding(new Insets(8, 20, 4, 20));
+
+            HBox buildBar = new HBox(12, buildRoadButton, buildSettlementButton, buildCityButton);
+            buildBar.setAlignment(Pos.CENTER_LEFT);
+            buildBar.setPadding(new Insets(4, 20, 8, 20));
+
+            VBox topArea = new VBox(topBar, buildBar);
 
             PlayerDashboard dashboard = new PlayerDashboard();
 
+            DiceView diceView = new DiceView();
+            diceView.setMouseTransparent(true); // dice are display-only; don't block board clicks
+            StackPane boardStack = new StackPane(boardView, diceView);
+            StackPane.setAlignment(diceView, Pos.BOTTOM_RIGHT);
+            StackPane.setMargin(diceView, new Insets(0, 20, 20, 0));
+
             BorderPane gameLayout = new BorderPane();
-            gameLayout.setTop(statusLabel);
-            gameLayout.setCenter(boardView);
+            gameLayout.setTop(topArea);
+            gameLayout.setCenter(boardStack);
             gameLayout.setBottom(dashboard);
 
             GameController controller = new GameController(
@@ -105,6 +135,16 @@ public class SettlersApp extends Application {
             );
             controller.setBoardView(boardView);
             controller.setPlayerDashboard(dashboard);
+
+            rollButton.setOnAction(ev           -> controller.rollDice());
+            endTurnButton.setOnAction(ev        -> controller.endTurn());
+            buildRoadButton.setOnAction(ev      -> controller.toggleBuildRoad());
+            buildSettlementButton.setOnAction(ev -> controller.toggleBuildSettlement());
+            buildCityButton.setOnAction(ev      -> controller.toggleBuildCity());
+
+            controller.setActionButtons(rollButton, endTurnButton);
+            controller.setBuildButtons(buildRoadButton, buildSettlementButton, buildCityButton);
+
             controller.startSetup();
 
             Scene gameScene = new Scene(gameLayout, windowSizeX, windowSizeY);

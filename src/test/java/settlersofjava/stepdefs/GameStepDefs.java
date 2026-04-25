@@ -72,6 +72,13 @@ public class GameStepDefs {
         assertFalse(game.getTurnManager().isSetupRound2());
     }
 
+    @When("the dice are rolled")
+    public void the_dice_are_rolled() {
+        // Mirrors what GameController.handleDiceRolled does to TurnManager (skip TRADE for now)
+        game.getTurnManager().advancePhase(); // ROLL → TRADE
+        game.getTurnManager().advancePhase(); // TRADE → BUILD
+    }
+
     @When("the phase is advanced from SETUP to ROLL")
     public void the_phase_is_advanced_from_setup() {
         game.getTurnManager().advancePhase();
