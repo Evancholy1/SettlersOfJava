@@ -60,6 +60,8 @@ public class TurnManager {
     }
 
     public void endTurn() {
+        getCurrentPlayer().unlockDevCards();
+
         currentPlayerIndex = (currentPlayerIndex + 1) % playerList.size();
         phase = GamePhase.ROLL;
     }

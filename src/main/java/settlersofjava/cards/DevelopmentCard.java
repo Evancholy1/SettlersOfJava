@@ -1,6 +1,9 @@
 package settlersofjava.cards;
 
 import settlersofjava.player.Player;
+import settlersofjava.resources.ResourceBundle;
+import settlersofjava.resources.ResourceType;
+import java.util.Map;
 
 /**
  * PATTERN: Polymorphism
@@ -9,22 +12,27 @@ import settlersofjava.player.Player;
  */
 public abstract class DevelopmentCard {
 
+    public static final ResourceBundle COST = new ResourceBundle(Map.of(
+            ResourceType.SHEEP, 1,
+            ResourceType.WHEAT, 1,
+            ResourceType.ORE, 1
+    ));
+
     private boolean played;
+    private boolean lockedThisTurn;
 
     protected DevelopmentCard() {
         this.played = false;
+        this.lockedThisTurn = true; // Locked on the turn it is bought
     }
 
     public boolean isPlayed() { return played; }
+    public boolean isLocked() { return lockedThisTurn; }
+    public void unlock() { this.lockedThisTurn = false; }
 
-    /**
-     * Executes this card's effect for the given player.
-     * Sets played = true. Cannot be played twice.
-     */
     public final void play(Player player) {
-        if (played) {
-            throw new IllegalStateException(getCardName() + " has already been played.");
-        }
+        if (played) throw new IllegalStateException(getCardName() + " has already been played.");
+        if (lockedThisTurn) throw new IllegalStateException("Card was bought this turn.");
         applyEffect(player);
         played = true;
     }

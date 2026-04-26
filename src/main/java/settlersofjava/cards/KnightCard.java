@@ -10,8 +10,7 @@ public class KnightCard extends DevelopmentCard {
 
     @Override
     protected void applyEffect(Player player) {
-        // TODO: trigger robber move flow, increment player.incrementArmySize()
-        throw new UnsupportedOperationException("Not yet implemented");
+        // Handled directly by GameController
     }
 
     @Override

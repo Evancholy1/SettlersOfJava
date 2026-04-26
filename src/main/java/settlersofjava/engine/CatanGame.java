@@ -1,6 +1,7 @@
 package settlersofjava.engine;
 
 import settlersofjava.board.BoardState;
+import settlersofjava.cards.DevelopmentCard;
 import settlersofjava.player.Player;
 import settlersofjava.player.PlayerColor;
 import settlersofjava.player.PlayerList;
@@ -21,6 +22,7 @@ public class CatanGame {
     private PlayerList playerList;
     private GamePhase currentPhase;
     private TurnManager turnManager;
+    private List<DevelopmentCard> devCardDeck;
 
     public static void resetInstance() {
         instance = null;
@@ -41,6 +43,7 @@ public class CatanGame {
         }
         this.playerList = new PlayerList(players);
         this.turnManager = new TurnManager(playerList);
+        this.devCardDeck = new settlersofjava.cards.DevCardFactory().createShuffledDeck();
     }
 
     public static CatanGame getInstance(List<String> playerNames) {
@@ -48,6 +51,10 @@ public class CatanGame {
             instance = new CatanGame(playerNames);
         }
         return instance;
+    }
+
+    public DevelopmentCard drawDevCard() {
+        return devCardDeck.isEmpty() ? null : devCardDeck.removeFirst();
     }
 
     public void setBoardState(BoardState boardState) {this.boardState = boardState;}

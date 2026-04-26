@@ -9,8 +9,7 @@ public class RoadBuildingCard extends DevelopmentCard {
 
     @Override
     protected void applyEffect(Player player) {
-        // TODO: grant player 2 free road placements this turn
-        throw new UnsupportedOperationException("Not yet implemented");
+        // Handled directly by GameController
     }
 
     @Override

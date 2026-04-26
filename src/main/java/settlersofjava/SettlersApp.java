@@ -5,6 +5,8 @@ import javafx.stage.Stage;
 import javafx.scene.Scene;
 import settlersofjava.board.BoardBuilder;
 import settlersofjava.board.BoardState;
+import settlersofjava.cards.DevCardFactory;
+import settlersofjava.cards.DevelopmentCard;
 import settlersofjava.ui.BoardView;
 import settlersofjava.ui.GameController;
 import settlersofjava.ui.PlayerDashboard;
@@ -93,6 +95,8 @@ public class SettlersApp extends Application {
                     .build();
             game.setBoardState(boardState);
 
+            List <DevelopmentCard> deck = new DevCardFactory().createShuffledDeck();
+
             BoardView boardView = new BoardView(boardState);
 
             Label statusLabel = new Label();
@@ -103,11 +107,13 @@ public class SettlersApp extends Application {
             Button buildRoadButton      = new Button("Build Road");
             Button buildSettlementButton = new Button("Build Settlement");
             Button buildCityButton      = new Button("Upgrade to City");
+            Button buildDevCardButton   = new Button("Buy Dev Card");
             rollButton.setFont(new Font(14));
             endTurnButton.setFont(new Font(14));
             buildRoadButton.setFont(new Font(14));
             buildSettlementButton.setFont(new Font(14));
             buildCityButton.setFont(new Font(14));
+            buildDevCardButton.setFont(new Font(14));
 
             HBox topBar = new HBox(20, statusLabel, rollButton, endTurnButton);
             topBar.setAlignment(Pos.CENTER_LEFT);
@@ -121,7 +127,7 @@ public class SettlersApp extends Application {
             tradeButton.setFont(new Font(14));
             tradeButton.setStyle("-fx-background-color: #1976D2; -fx-text-fill: white; -fx-font-weight: bold;");
 
-            HBox buildBar = new HBox(12, buildRoadButton, buildSettlementButton, buildCityButton, tradeButton, testButton);
+            HBox buildBar = new HBox(12, buildRoadButton, buildSettlementButton, buildCityButton, buildDevCardButton, tradeButton, testButton);
             buildBar.setAlignment(Pos.CENTER_LEFT);
             buildBar.setPadding(new Insets(4, 20, 8, 20));
 
@@ -150,7 +156,8 @@ public class SettlersApp extends Application {
                     boardState,
                     game.getPlayerList(),
                     game.getTurnManager(),
-                    statusLabel::setText
+                    statusLabel::setText,
+                    deck
             );
             controller.setBoardView(boardView);
             controller.setPlayerDashboard(dashboard);
@@ -169,9 +176,10 @@ public class SettlersApp extends Application {
             buildRoadButton.setOnAction(ev      -> controller.toggleBuildRoad());
             buildSettlementButton.setOnAction(ev -> controller.toggleBuildSettlement());
             buildCityButton.setOnAction(ev      -> controller.toggleBuildCity());
+            buildDevCardButton.setOnAction(ev   -> controller.purchaseDevCard());
 
             controller.setActionButtons(rollButton, endTurnButton);
-            controller.setBuildButtons(buildRoadButton, buildSettlementButton, buildCityButton);
+            controller.setBuildButtons(buildRoadButton, buildSettlementButton, buildCityButton, buildDevCardButton);
 
             controller.startSetup();
 

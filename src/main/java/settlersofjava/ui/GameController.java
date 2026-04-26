@@ -5,6 +5,7 @@ import settlersofjava.board.*;
 import settlersofjava.buildings.City;
 import settlersofjava.buildings.Road;
 import settlersofjava.buildings.Settlement;
+import settlersofjava.cards.DevelopmentCard;
 import settlersofjava.trade.PlayerTradeOffer;
 import settlersofjava.trade.PortTradeStrategy;
 import settlersofjava.dice.Die;
@@ -53,6 +54,9 @@ public class GameController implements GameEventListener {
     private PlayerDashboard playerDashboard;
     private TradingPanel    tradingPanel;
 
+    private final List<DevelopmentCard> devCardDeck;
+    private boolean devCardPlayedThisTurn = false;
+
     // ── Player trade panels + state ───────────────────────────────────────────
     private PlayerTradeOfferPanel    tradeOfferPanel;
     private PlayerTradeResponsePanel tradeResponsePanel;
@@ -67,10 +71,12 @@ public class GameController implements GameEventListener {
     private Button buildRoadButton;
     private Button buildSettlementButton;
     private Button buildCityButton;
+    private Button buildDevCardButton;
 
     // ── Build mode ────────────────────────────────────────────────────────────
-    private enum BuildMode { NONE, ROAD, SETTLEMENT, CITY }
+    private enum BuildMode { NONE, ROAD, SETTLEMENT, CITY, ROAD_BUILDING_CARD }
     private BuildMode buildMode = BuildMode.NONE;
+    private int freeRoadsLeft = 0;
 
     // ── Robber mode ───────────────────────────────────────────────────────────
     private boolean robberMode = false;
@@ -85,11 +91,13 @@ public class GameController implements GameEventListener {
     public GameController(BoardState boardState,
                           PlayerList playerList,
                           TurnManager turnManager,
-                          Consumer<String> statusUpdater) {
+                          Consumer<String> statusUpdater,
+                          List<DevelopmentCard> devCardDeck) {
         this.boardState    = boardState;
         this.playerList    = playerList;
         this.turnManager   = turnManager;
         this.statusUpdater = statusUpdater;
+        this.devCardDeck   = devCardDeck;
         EventBus.getInstance().register(this);
         // Refresh build buttons whenever any player's resources change
         MapChangeListener<ResourceType, Integer> resourceWatcher =
@@ -111,6 +119,7 @@ public class GameController implements GameEventListener {
     public void setPlayerDashboard(PlayerDashboard dashboard) {
         this.playerDashboard = dashboard;
         dashboard.setOnResourceCardClick(this::openBankTrade);
+        dashboard.setOnDevCardPlay(this::playDevCard);
     }
 
     public void setActionButtons(Button roll, Button endTurn) {
@@ -202,10 +211,11 @@ public class GameController implements GameEventListener {
         tradeResponders = null;
     }
 
-    public void setBuildButtons(Button road, Button settlement, Button city) {
+    public void setBuildButtons(Button road, Button settlement, Button city, Button devCard) {
         this.buildRoadButton       = road;
         this.buildSettlementButton = settlement;
         this.buildCityButton       = city;
+        this.buildDevCardButton    = devCard;
         updateBuildButtons();
     }
 
@@ -331,13 +341,29 @@ public class GameController implements GameEventListener {
     }
 
     private void handleBuildEdgeClick(Edge e) {
-        if (buildMode != BuildMode.ROAD) return;
         Player p = turnManager.getCurrentPlayer();
-        if (!isValidMainRoad(e)) return;
-        spend(Road.COST, p);
-        e.placeRoad(new Road(p));
-        log(seg(p.getName(), logColor(p)), seg(" built a Road", Color.web("#444444")));
-        afterBuild();
+
+        if (buildMode == BuildMode.ROAD) {
+            if (!isValidMainRoad(e)) return;
+            spend(Road.COST, p);
+            e.placeRoad(new Road(p));
+            log(seg(p.getName(), logColor(p)), seg(" built a Road", Color.web("#444444")));
+            afterBuild();
+
+        } else if (buildMode == BuildMode.ROAD_BUILDING_CARD) {
+            if (!isValidFreeRoad(e)) return;
+            e.placeRoad(new Road(p));
+            freeRoadsLeft--;
+            log(seg(p.getName(), logColor(p)), seg(" placed a free Road", Color.web("#444444")));
+
+            if (freeRoadsLeft <= 0) {
+                buildMode = BuildMode.NONE;
+                statusUpdater.accept(p.getName() + " finished placing free roads. Build something or end your turn.");
+            } else {
+                statusUpdater.accept(p.getName() + " — place 1 more free road.");
+            }
+            afterBuild();
+        }
     }
 
     private void afterBuild() {
@@ -378,6 +404,20 @@ public class GameController implements GameEventListener {
         return false;
     }
 
+    // Main game: same as isValidMainRoad but does not check cost
+    private boolean isValidFreeRoad(Edge e) {
+        if (e.hasRoad()) return false;
+        Player p = turnManager.getCurrentPlayer();
+        if (countRoads(p) >= 15) return false;
+        for (Vertex endpoint : List.of(e.getVertexA(), e.getVertexB())) {
+            if (endpoint.isOccupied() && endpoint.getBuilding().getOwner() == p) return true;
+            for (Edge adj : boardState.getEdgesFor(endpoint)) {
+                if (adj != e && adj.hasRoad() && adj.getRoad().getOwner() == p) return true;
+            }
+        }
+        return false;
+    }
+
     // Main game: unoccupied, distance rule, AND adjacent to own road
     private boolean isValidMainSettlement(Vertex v) {
         if (v.isOccupied()) return false;
@@ -400,8 +440,7 @@ public class GameController implements GameEventListener {
         return v.getBuilding().getOwner() == p
             && v.getBuilding() instanceof Settlement
             && p.canAfford(City.COST)
-            && countCities(p) < 4;
-    }
+            && countCities(p) < 4;    }
 
     // ── Piece-count helpers ───────────────────────────────────────────────────
 
@@ -542,6 +581,15 @@ public class GameController implements GameEventListener {
                         }
                         boardView.setHighlightedCityUpgrades(valid);
                     }
+                    case ROAD_BUILDING_CARD -> {
+                        boardView.setHighlightedCityUpgrades(new HashSet<>());
+                        boardView.setHighlightedVertices(new HashSet<>());
+                        Set<Edge> valid = new HashSet<>();
+                        for (Edge e : boardState.getEdges()) {
+                            if (isValidFreeRoad(e)) valid.add(e);
+                        }
+                        boardView.setHighlightedEdges(valid);
+                    }
                     case NONE -> {
                         boardView.setHighlightedCityUpgrades(new HashSet<>());
                         boardView.setHighlightedVertices(new HashSet<>());
@@ -595,6 +643,9 @@ public class GameController implements GameEventListener {
         setBuildBtn(buildRoadButton,       BuildMode.ROAD,       isBuild && p.canAfford(Road.COST));
         setBuildBtn(buildSettlementButton, BuildMode.SETTLEMENT, isBuild && p.canAfford(Settlement.COST));
         setBuildBtn(buildCityButton,       BuildMode.CITY,       isBuild && p.canAfford(City.COST));
+        if (buildDevCardButton != null) {
+            buildDevCardButton.setDisable(!(isBuild && p.canAfford(settlersofjava.cards.DevelopmentCard.COST)));
+        }
     }
 
     private void setBuildBtn(Button btn, BuildMode mode, boolean enabled) {
@@ -738,6 +789,7 @@ public class GameController implements GameEventListener {
     }
 
     private void handleTurnEnded() {
+        devCardPlayedThisTurn = false;
         updateDashboard();
         updateStatus();
         updateActionButtons();
@@ -746,6 +798,62 @@ public class GameController implements GameEventListener {
 
     private void handleGameOver(Object payload) {
         // TODO: show winner dialog
+    }
+
+    public void purchaseDevCard() {
+        if (turnManager.getPhase() != GamePhase.BUILD) return;
+        Player p = turnManager.getCurrentPlayer();
+
+        if (!p.canAfford(DevelopmentCard.COST)) return;
+
+        if (devCardDeck.isEmpty()) {
+            log(LogEntry.plain("The Development Card deck is empty!", Color.FIREBRICK));
+            return;
+        }
+
+        DevelopmentCard drawn = devCardDeck.removeFirst();
+
+        spend(DevelopmentCard.COST, p);
+        p.addDevCard(drawn);
+
+        // NOTE: VP cards are explicitly NOT added to the player's public score here to keep them hidden.
+
+        log(seg(p.getName(), logColor(p)), seg(" bought a Development Card.", Color.web("#444444")));
+        updateBuildButtons();
+        updateDashboard();
+    }
+
+    private void playDevCard(settlersofjava.cards.DevelopmentCard card) {
+        if (turnManager.getPhase() != GamePhase.BUILD) {
+            log(LogEntry.plain("You must roll the dice before playing a Development Card.", Color.FIREBRICK));
+            return;
+        }
+        if (devCardPlayedThisTurn) {
+            log(LogEntry.plain("You can only play one Development Card per turn.", Color.FIREBRICK));
+            return;
+        }
+
+        Player p = turnManager.getCurrentPlayer();
+        card.play(p);
+        devCardPlayedThisTurn = true;
+        log(seg(p.getName(), logColor(p)), seg(" played ", Color.web("#444444")), seg(card.getCardName(), Color.web("#B8860B")));
+
+        if (card instanceof settlersofjava.cards.KnightCard) {
+            robberMode = true;
+            updateHighlights();
+            updateActionButtons();
+            updateBuildButtons();
+            statusUpdater.accept(p.getName() + " played a Knight — move the robber to a new tile!");
+        } else if (card instanceof settlersofjava.cards.RoadBuildingCard) {
+            p.removeDevCard(card);
+            buildMode = BuildMode.ROAD_BUILDING_CARD;
+            freeRoadsLeft = 2;
+            updateHighlights();
+            updateBuildButtons();
+            statusUpdater.accept(p.getName() + " played Road Building — place 2 free roads.");
+        }
+
+        updateDashboard();
     }
 
     // ── Log helpers ───────────────────────────────────────────────────────────

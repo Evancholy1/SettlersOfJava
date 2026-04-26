@@ -31,6 +31,8 @@ public class PlayerDashboard extends HBox {
     private final Text    iconInitial;
     private final Label   nameLabel;
     private final HBox    cardsBox;
+    private final HBox    devCardsBox;
+    private java.util.function.Consumer<settlersofjava.cards.DevelopmentCard> onDevCardPlay;
 
     private Consumer<ResourceType> onResourceCardClick;
 
@@ -61,7 +63,15 @@ public class PlayerDashboard extends HBox {
         cardsBox = new HBox(8);
         cardsBox.setAlignment(Pos.CENTER_LEFT);
 
-        getChildren().addAll(playerInfo, new Separator(Orientation.VERTICAL), cardsBox);
+        // ── Dev cards ─────────────────────────────────────────────────────────
+        devCardsBox = new HBox(8);
+        devCardsBox.setAlignment(Pos.CENTER_LEFT);
+
+        getChildren().addAll(playerInfo, new Separator(Orientation.VERTICAL), cardsBox, new Separator(Orientation.VERTICAL), devCardsBox);
+    }
+
+    public void setOnDevCardPlay(java.util.function.Consumer<settlersofjava.cards.DevelopmentCard> handler) {
+        this.onDevCardPlay = handler;
     }
 
     /**
@@ -81,6 +91,13 @@ public class PlayerDashboard extends HBox {
         cardsBox.getChildren().clear();
         for (ResourceType type : ResourceType.values()) {
             cardsBox.getChildren().add(new ResourceCardView(player, type, onResourceCardClick));
+        }
+
+        devCardsBox.getChildren().clear();
+        for (settlersofjava.cards.DevelopmentCard card : player.getDevCards()) {
+            devCardsBox.getChildren().add(new DevCardView(card, () -> {
+                if (onDevCardPlay != null) onDevCardPlay.accept(card);
+            }));
         }
     }
 }

@@ -7,6 +7,7 @@ import javafx.beans.property.SimpleIntegerProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableMap;
 import java.util.Map;
+import settlersofjava.cards.DevelopmentCard;
 /**
  * PATTERN: Observer (via JavaFX Properties)
  * A player's state is exposed via JavaFX observable properties so that
@@ -24,6 +25,7 @@ public class Player {
     private final ObservableMap<ResourceType, Integer> resources;
     private final IntegerProperty victoryPoints;
     private final IntegerProperty armySize;
+    private final javafx.collections.ObservableList<DevelopmentCard> devCards;
 
     public Player(String name, PlayerColor color) {
         this.name = name;
@@ -31,6 +33,7 @@ public class Player {
         this.resources = FXCollections.observableHashMap();
         this.victoryPoints = new SimpleIntegerProperty(0);
         this.armySize = new SimpleIntegerProperty(0);
+        this.devCards = FXCollections.observableArrayList();
 
         // Initialize all resource counts to 0
         for (ResourceType type : ResourceType.values()) {
@@ -86,5 +89,17 @@ public class Player {
 
     @Override
     public String toString() { return name + " (" + color + ")"; }
+
+    // ── Development Card Management  ───────────────────────────────────────────
+
+    public javafx.collections.ObservableList<DevelopmentCard> getDevCards() { return devCards; }
+
+    public void addDevCard(DevelopmentCard card) { devCards.add(card); }
+
+    public void removeDevCard(DevelopmentCard card) { devCards.remove(card); }
+
+    public void unlockDevCards() {
+        for (DevelopmentCard card : devCards) card.unlock();
+    }
 }
 
