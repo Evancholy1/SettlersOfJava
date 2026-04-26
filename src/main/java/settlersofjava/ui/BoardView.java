@@ -1,13 +1,17 @@
 package settlersofjava.ui;
 
+import javafx.animation.Interpolator;
 import javafx.animation.KeyFrame;
 import javafx.animation.KeyValue;
 import javafx.animation.PauseTransition;
 import javafx.animation.Timeline;
+import javafx.animation.TranslateTransition;
 import javafx.beans.property.SimpleDoubleProperty;
 import javafx.geometry.Pos;
 import javafx.scene.control.Label;
 import javafx.scene.effect.DropShadow;
+import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
 import javafx.scene.layout.Pane;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
@@ -43,12 +47,17 @@ public class BoardView extends Pane implements GameEventListener {
     /** vertexId → [screenX, screenY] */
     private final Map<Integer, double[]> vertexPos = new HashMap<>();
 
-    private Consumer<Vertex> onVertexClick;
-    private Consumer<Edge>   onEdgeClick;
+    private Consumer<Vertex>  onVertexClick;
+    private Consumer<Edge>    onEdgeClick;
+    private Consumer<HexTile> onTileClick;
 
     private Set<Vertex>  highlightedVertices    = new HashSet<>();
     private Set<Vertex>  highlightedCityUpgrades = new HashSet<>();
     private Set<Edge>    highlightedEdges        = new HashSet<>();
+    private Set<HexTile> highlightedTiles        = new HashSet<>();
+
+    private final Image     robberImage;
+    private final ImageView robberView;
 
     // Live DropShadow objects on city-upgrade circles — animated in-place, no redraw needed
     private final List<DropShadow> cityGlowEffects = new ArrayList<>();
@@ -60,6 +69,13 @@ public class BoardView extends Pane implements GameEventListener {
 
     public BoardView(BoardState boardState) {
         this.boardState = boardState;
+        robberImage = new Image(
+                getClass().getResourceAsStream("/settlersofjava/ui/robber/robber.png"));
+        robberView  = new ImageView(robberImage);
+        robberView.setFitWidth(38);
+        robberView.setFitHeight(38);
+        robberView.setPreserveRatio(true);
+        robberView.setMouseTransparent(true);
         setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
         EventBus.getInstance().register(this);
         // Update existing glow effects in-place — avoids wiping nodes between animation ticks
@@ -72,6 +88,7 @@ public class BoardView extends Pane implements GameEventListener {
 
     @Override
     public void onEvent(GameEvent event, Object payload) {
+        if (event == GameEvent.ROBBER_MOVED) { animateRobberMove(); return; }
         if (event != GameEvent.DICE_ROLLED) return;
         int[] roll  = (int[]) payload;
         int   total = roll[0] + roll[1];
@@ -88,8 +105,14 @@ public class BoardView extends Pane implements GameEventListener {
         flashTimer.play();
     }
 
-    public void setOnVertexClick(Consumer<Vertex> handler) { this.onVertexClick = handler; }
-    public void setOnEdgeClick(Consumer<Edge> handler)     { this.onEdgeClick   = handler; }
+    public void setOnVertexClick(Consumer<Vertex>  handler) { this.onVertexClick = handler; }
+    public void setOnEdgeClick(Consumer<Edge>     handler) { this.onEdgeClick   = handler; }
+    public void setOnTileClick(Consumer<HexTile>  handler) { this.onTileClick   = handler; }
+
+    public void setHighlightedTiles(Set<HexTile> tiles) {
+        this.highlightedTiles = tiles;
+        drawBoard();
+    }
 
     public void setHighlightedVertices(Set<Vertex> vertices) {
         this.highlightedVertices = vertices;
@@ -170,6 +193,34 @@ public class BoardView extends Pane implements GameEventListener {
             }
         }
 
+        // Draw robber placement highlights (semi-transparent overlay on valid tiles)
+        for (HexTile tile : highlightedTiles) {
+            double[] c = tileCenter(tile);
+            Polygon overlay = new Polygon();
+            for (int i = 0; i < 6; i++) {
+                double angle = Math.toRadians(60 * i - 30);
+                overlay.getPoints().addAll(
+                    c[0] + HEX_SIZE * Math.cos(angle),
+                    c[1] + HEX_SIZE * Math.sin(angle)
+                );
+            }
+            overlay.setFill(Color.rgb(255, 200, 0, 0.35));
+            overlay.setStroke(Color.ORANGE);
+            overlay.setStrokeWidth(3);
+            final HexTile t = tile;
+            overlay.setOnMouseClicked(ev -> { if (onTileClick != null) onTileClick.accept(t); });
+            getChildren().add(overlay);
+        }
+
+        // Robber icon — added last so it's always on top; position set here,
+        // animation offset (translateX/Y) is managed by animateRobberMove().
+        HexTile robber = boardState.getRobberTile();
+        if (robber != null) {
+            double[] c = tileCenter(robber);
+            robberView.setLayoutX(c[0] - 19);
+            robberView.setLayoutY(c[1] - 19);
+        }
+
         // Draw ports (behind edges and vertices)
         drawPorts();
 
@@ -235,6 +286,9 @@ public class BoardView extends Pane implements GameEventListener {
                 getChildren().add(c);
             }
         }
+
+        // Robber always on top — re-added each redraw; translate offset preserved for animation
+        if (boardState.getRobberTile() != null) getChildren().add(robberView);
     }
 
     private void drawDiamond(double[] pos, Color fill, boolean glowing, Vertex v) {
@@ -257,6 +311,30 @@ public class BoardView extends Pane implements GameEventListener {
             diamond.setOnMouseClicked(ev -> { if (onVertexClick != null) onVertexClick.accept(fv); });
         }
         getChildren().add(diamond);
+    }
+
+    // ── Robber animation ──────────────────────────────────────────────────────
+
+    private void animateRobberMove() {
+        // Capture where the icon visually is right now (layout + any in-flight translate)
+        double fromX = robberView.getLayoutX() + robberView.getTranslateX();
+        double fromY = robberView.getLayoutY() + robberView.getTranslateY();
+
+        // Redraw moves layoutX/Y to the new tile; translate is reset to zero by drawBoard
+        robberView.setTranslateX(0);
+        robberView.setTranslateY(0);
+        drawBoard(); // sets robberView.layoutX/Y to destination
+
+        // Offset translate so the icon still appears at fromX/Y visually
+        robberView.setTranslateX(fromX - robberView.getLayoutX());
+        robberView.setTranslateY(fromY - robberView.getLayoutY());
+
+        // Animate translate → (0, 0) so the icon slides to its new layout position
+        TranslateTransition tt = new TranslateTransition(Duration.millis(500), robberView);
+        tt.setToX(0);
+        tt.setToY(0);
+        tt.setInterpolator(Interpolator.EASE_BOTH);
+        tt.play();
     }
 
     // ── Port rendering ───────────────────────────────────────────────────────

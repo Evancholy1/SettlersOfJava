@@ -5,6 +5,7 @@ import settlersofjava.board.*;
 import settlersofjava.buildings.City;
 import settlersofjava.buildings.Road;
 import settlersofjava.buildings.Settlement;
+import settlersofjava.trade.PortTradeStrategy;
 import settlersofjava.dice.Die;
 import settlersofjava.dice.RandomDie;
 import settlersofjava.engine.GamePhase;
@@ -17,8 +18,16 @@ import settlersofjava.player.PlayerList;
 import settlersofjava.resources.ResourceBundle;
 import settlersofjava.resources.ResourceType;
 
+import javafx.collections.MapChangeListener;
+import javafx.scene.paint.Color;
+
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Random;
 import java.util.Set;
 import java.util.function.Consumer;
 
@@ -41,6 +50,7 @@ public class GameController implements GameEventListener {
 
     private BoardView       boardView;
     private PlayerDashboard playerDashboard;
+    private TradingPanel    tradingPanel;
 
     // ── Action buttons ────────────────────────────────────────────────────────
     private Button rollButton;
@@ -52,6 +62,9 @@ public class GameController implements GameEventListener {
     // ── Build mode ────────────────────────────────────────────────────────────
     private enum BuildMode { NONE, ROAD, SETTLEMENT, CITY }
     private BuildMode buildMode = BuildMode.NONE;
+
+    // ── Robber mode ───────────────────────────────────────────────────────────
+    private boolean robberMode = false;
 
     // ── Setup sub-phase ───────────────────────────────────────────────────────
     private enum SetupSubPhase { PLACE_SETTLEMENT, PLACE_ROAD }
@@ -69,6 +82,12 @@ public class GameController implements GameEventListener {
         this.turnManager   = turnManager;
         this.statusUpdater = statusUpdater;
         EventBus.getInstance().register(this);
+        // Refresh build buttons whenever any player's resources change
+        MapChangeListener<ResourceType, Integer> resourceWatcher =
+            change -> updateBuildButtons();
+        for (Player p : playerList.getAll()) {
+            p.resourcesProperty().addListener(resourceWatcher);
+        }
     }
 
     // ── Wiring setters ────────────────────────────────────────────────────────
@@ -77,16 +96,22 @@ public class GameController implements GameEventListener {
         this.boardView = view;
         view.setOnVertexClick(this::handleVertexClick);
         view.setOnEdgeClick(this::handleEdgeClick);
+        view.setOnTileClick(this::handleTileClick);
     }
 
     public void setPlayerDashboard(PlayerDashboard dashboard) {
         this.playerDashboard = dashboard;
+        dashboard.setOnResourceCardClick(this::openBankTrade);
     }
 
     public void setActionButtons(Button roll, Button endTurn) {
         this.rollButton    = roll;
         this.endTurnButton = endTurn;
         updateActionButtons();
+    }
+
+    public void setTradingPanel(TradingPanel panel) {
+        this.tradingPanel = panel;
     }
 
     public void setBuildButtons(Button road, Button settlement, Button city) {
@@ -131,6 +156,7 @@ public class GameController implements GameEventListener {
     public void endTurn() {
         if (turnManager.getPhase() != GamePhase.BUILD) return;
         buildMode = BuildMode.NONE;
+        if (tradingPanel != null) tradingPanel.reset();
         updateHighlights();
         turnManager.endTurn();
         EventBus.getInstance().publish(GameEvent.TURN_ENDED);
@@ -164,6 +190,7 @@ public class GameController implements GameEventListener {
         v.placeBuilding(new Settlement(current));
         current.addVictoryPoints(1);
         lastPlacedSettlement = v;
+        log(seg(current.getName(), logColor(current)), seg(" placed a Settlement", Color.web("#444444")));
 
         if (turnManager.isSetupRound2()) giveStartingResources(v, current);
 
@@ -178,6 +205,7 @@ public class GameController implements GameEventListener {
 
         Player current = turnManager.getCurrentPlayer();
         e.placeRoad(new Road(current));
+        log(seg(current.getName(), logColor(current)), seg(" placed a Road", Color.web("#444444")));
 
         setupSubPhase = SetupSubPhase.PLACE_SETTLEMENT;
         lastPlacedSettlement = null;
@@ -199,13 +227,15 @@ public class GameController implements GameEventListener {
                 spend(Settlement.COST, p);
                 v.placeBuilding(new Settlement(p));
                 p.addVictoryPoints(1);
+                log(seg(p.getName(), logColor(p)), seg(" built a Settlement", Color.web("#444444")));
                 afterBuild();
             }
             case CITY -> {
                 if (!isValidCityUpgrade(v)) return;
                 spend(City.COST, p);
                 v.upgradeBuilding(new City(p));
-                p.addVictoryPoints(1); // net +1VP: settlement was 1, city is 2
+                p.addVictoryPoints(1);
+                log(seg(p.getName(), logColor(p)), seg(" upgraded to a City", Color.web("#444444")));
                 afterBuild();
             }
             default -> {}
@@ -218,6 +248,7 @@ public class GameController implements GameEventListener {
         if (!isValidMainRoad(e)) return;
         spend(Road.COST, p);
         e.placeRoad(new Road(p));
+        log(seg(p.getName(), logColor(p)), seg(" built a Road", Color.web("#444444")));
         afterBuild();
     }
 
@@ -249,6 +280,7 @@ public class GameController implements GameEventListener {
         if (e.hasRoad()) return false;
         Player p = turnManager.getCurrentPlayer();
         if (!p.canAfford(Road.COST)) return false;
+        if (countRoads(p) >= 15) return false;
         for (Vertex endpoint : List.of(e.getVertexA(), e.getVertexB())) {
             if (endpoint.isOccupied() && endpoint.getBuilding().getOwner() == p) return true;
             for (Edge adj : boardState.getEdgesFor(endpoint)) {
@@ -263,6 +295,7 @@ public class GameController implements GameEventListener {
         if (v.isOccupied()) return false;
         Player p = turnManager.getCurrentPlayer();
         if (!p.canAfford(Settlement.COST)) return false;
+        if (countSettlements(p) >= 5) return false;
         for (Vertex adj : boardState.getAdjacentVertices(v)) {
             if (adj.isOccupied()) return false;
         }
@@ -278,7 +311,32 @@ public class GameController implements GameEventListener {
         Player p = turnManager.getCurrentPlayer();
         return v.getBuilding().getOwner() == p
             && v.getBuilding() instanceof Settlement
-            && p.canAfford(City.COST);
+            && p.canAfford(City.COST)
+            && countCities(p) < 4;
+    }
+
+    // ── Piece-count helpers ───────────────────────────────────────────────────
+
+    private long countRoads(Player p) {
+        return boardState.getEdges().stream()
+                .filter(e -> e.hasRoad() && e.getRoad().getOwner() == p)
+                .count();
+    }
+
+    private long countSettlements(Player p) {
+        return boardState.getVertices().stream()
+                .filter(v -> v.isOccupied()
+                          && v.getBuilding() instanceof Settlement
+                          && v.getBuilding().getOwner() == p)
+                .count();
+    }
+
+    private long countCities(Player p) {
+        return boardState.getVertices().stream()
+                .filter(v -> v.isOccupied()
+                          && v.getBuilding() instanceof City
+                          && v.getBuilding().getOwner() == p)
+                .count();
     }
 
     // ── Resource helpers ──────────────────────────────────────────────────────
@@ -293,6 +351,7 @@ public class GameController implements GameEventListener {
     }
 
     private void distributeResources(int diceTotal) {
+        Map<Player, Map<ResourceType, Integer>> gains = new LinkedHashMap<>();
         for (HexTile tile : boardState.getActiveTilesFor(diceTotal)) {
             if (!(tile instanceof ResourceTile rt)) continue;
             ResourceType res = rt.getTerrainType().toResourceType();
@@ -300,7 +359,28 @@ public class GameController implements GameEventListener {
             for (Vertex v : boardState.getVerticesFor(tile.getCoordinate())) {
                 if (!v.isOccupied()) continue;
                 int amount = v.getBuilding() instanceof City ? 2 : 1;
-                v.getBuilding().getOwner().addResource(res, amount);
+                Player owner = v.getBuilding().getOwner();
+                owner.addResource(res, amount);
+                gains.computeIfAbsent(owner, p -> new LinkedHashMap<>())
+                     .merge(res, amount, Integer::sum);
+            }
+        }
+        if (gains.isEmpty()) {
+            log(LogEntry.plain("No resources produced.", Color.web("#888888")));
+        } else {
+            for (var e : gains.entrySet()) {
+                Player p = e.getKey();
+                List<LogEntry.Segment> segs = new ArrayList<>();
+                segs.add(new LogEntry.Segment(p.getName(), logColor(p)));
+                segs.add(new LogEntry.Segment(" got ", Color.web("#444444")));
+                boolean first = true;
+                for (var re : e.getValue().entrySet()) {
+                    if (!first) segs.add(new LogEntry.Segment(", ", Color.web("#444444")));
+                    segs.add(new LogEntry.Segment(
+                        re.getValue() + " " + capitalize(re.getKey().name()), resourceColor(re.getKey())));
+                    first = false;
+                }
+                EventBus.getInstance().publish(GameEvent.LOG_MESSAGE, new LogEntry(segs));
             }
         }
     }
@@ -313,6 +393,18 @@ public class GameController implements GameEventListener {
 
     private void updateHighlights() {
         if (boardView == null) return;
+
+        if (robberMode) {
+            Set<HexTile> valid = new HashSet<>();
+            for (HexTile t : boardState.getTiles())
+                if (t != boardState.getRobberTile()) valid.add(t);
+            boardView.setHighlightedTiles(valid);
+            boardView.setHighlightedCityUpgrades(new HashSet<>());
+            boardView.setHighlightedVertices(new HashSet<>());
+            boardView.setHighlightedEdges(new HashSet<>());
+            return;
+        }
+        boardView.setHighlightedTiles(new HashSet<>());
 
         switch (turnManager.getPhase()) {
             case SETUP -> {
@@ -440,15 +532,92 @@ public class GameController implements GameEventListener {
     private void handleDiceRolled(Object payload) {
         int[] roll  = (int[]) payload;
         int   total = roll[0] + roll[1];
-        distributeResources(total);
-        turnManager.advancePhase(); // ROLL → TRADE (skipped for now)
+        Player current = turnManager.getCurrentPlayer();
+        if (total == 7) {
+            log(seg(current.getName(), logColor(current)),
+                seg(" rolled ", Color.web("#444444")),
+                seg("7", Color.FIREBRICK),
+                seg(" — Robber moves!", Color.web("#444444")));
+            robberMode = true;
+            updateHighlights();
+            updateActionButtons();
+            updateBuildButtons();
+            statusUpdater.accept(current.getName() + " rolled 7 — move the robber to a new tile!");
+        } else {
+            log(seg(current.getName(), logColor(current)),
+                seg(" rolled ", Color.web("#444444")),
+                seg(String.valueOf(total), total == 6 || total == 8 ? Color.web("#B8860B") : Color.web("#222222")));
+            distributeResources(total);
+            turnManager.advancePhase();
+            turnManager.advancePhase();
+            statusUpdater.accept(current.getName() + " rolled " + total + " — build something or end your turn.");
+            updateActionButtons();
+            updateBuildButtons();
+        }
+    }
+
+    private void handleTileClick(HexTile tile) {
+        if (!robberMode) return;
+        if (tile == boardState.getRobberTile()) return; // must move to a new tile
+
+        boardState.moveRobber(tile);
+        EventBus.getInstance().publish(GameEvent.ROBBER_MOVED, tile);
+
+        Player current = turnManager.getCurrentPlayer();
+        log(seg(current.getName(), logColor(current)), seg(" moved the Robber", Color.web("#444444")));
+
+        List<Player> targets = boardState.getVerticesFor(tile.getCoordinate()).stream()
+                .filter(Vertex::isOccupied)
+                .map(v -> v.getBuilding().getOwner())
+                .filter(p -> p != current)
+                .distinct()
+                .toList();
+        if (!targets.isEmpty()) {
+            Player victim = targets.get(new Random().nextInt(targets.size()));
+            stealRandomResource(victim, current).ifPresent(stolen ->
+                log(seg(current.getName(), logColor(current)),
+                    seg(" stole 1 ", Color.web("#444444")),
+                    seg(capitalize(stolen.name()), resourceColor(stolen)),
+                    seg(" from ", Color.web("#444444")),
+                    seg(victim.getName(), logColor(victim))));
+            updateDashboard();
+        }
+
+        robberMode = false;
+        turnManager.advancePhase(); // ROLL → TRADE
         turnManager.advancePhase(); // TRADE → BUILD
-        statusUpdater.accept(
-            turnManager.getCurrentPlayer().getName()
-            + " rolled " + total + " — build something or end your turn."
-        );
+        updateHighlights();
         updateActionButtons();
         updateBuildButtons();
+        updateStatus();
+    }
+
+    private void openBankTrade(ResourceType giveType) {
+        if (turnManager.getPhase() != GamePhase.BUILD) return;
+        Player current = turnManager.getCurrentPlayer();
+        if (current.getResource(giveType) < 1) return;
+        if (tradingPanel != null) tradingPanel.stageOne(giveType, current, getBestRate(current, giveType));
+    }
+
+    private int getBestRate(Player player, ResourceType type) {
+        int best = 4;
+        for (Vertex v : boardState.getVertices()) {
+            if (!v.isOccupied() || v.getBuilding().getOwner() != player || !v.hasPort()) continue;
+            int rate = new PortTradeStrategy(v.getPort()).getRate(type);
+            if (rate < best) best = rate;
+        }
+        return best;
+    }
+
+    private Optional<ResourceType> stealRandomResource(Player from, Player to) {
+        List<ResourceType> pool = new ArrayList<>();
+        for (ResourceType type : ResourceType.values())
+            for (int i = 0; i < from.getResource(type); i++) pool.add(type);
+        if (pool.isEmpty()) return Optional.empty();
+        ResourceType stolen = pool.get(new Random().nextInt(pool.size()));
+        from.removeResource(stolen, 1);
+        to.addResource(stolen, 1);
+        return Optional.of(stolen);
     }
 
     private void handleTurnEnded() {
@@ -460,5 +629,42 @@ public class GameController implements GameEventListener {
 
     private void handleGameOver(Object payload) {
         // TODO: show winner dialog
+    }
+
+    // ── Log helpers ───────────────────────────────────────────────────────────
+
+    private void log(LogEntry.Segment... segments) {
+        EventBus.getInstance().publish(GameEvent.LOG_MESSAGE, new LogEntry(List.of(segments)));
+    }
+
+    private void log(LogEntry entry) {
+        EventBus.getInstance().publish(GameEvent.LOG_MESSAGE, entry);
+    }
+
+    private LogEntry.Segment seg(String text, Color color) {
+        return new LogEntry.Segment(text, color);
+    }
+
+    private Color logColor(Player p) {
+        return switch (p.getColor()) {
+            case RED    -> Color.web("#C62828");
+            case BLUE   -> Color.web("#1565C0");
+            case BLACK  -> Color.web("#212121");
+            case ORANGE -> Color.web("#E65100");
+        };
+    }
+
+    private Color resourceColor(ResourceType type) {
+        return switch (type) {
+            case WOOD  -> Color.FORESTGREEN;
+            case BRICK -> Color.FIREBRICK;
+            case SHEEP -> Color.web("#2E7D32");
+            case WHEAT -> Color.web("#B8860B");
+            case ORE   -> Color.web("#546E7A");
+        };
+    }
+
+    private String capitalize(String s) {
+        return s.isEmpty() ? s : s.charAt(0) + s.substring(1).toLowerCase();
     }
 }

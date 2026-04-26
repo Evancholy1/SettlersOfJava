@@ -13,6 +13,7 @@ public enum GameEvent {
     DEV_CARD_PLAYED,
     TRADE_COMPLETED,
     TURN_ENDED,
-    GAME_OVER
+    GAME_OVER,
+    LOG_MESSAGE
 }
 

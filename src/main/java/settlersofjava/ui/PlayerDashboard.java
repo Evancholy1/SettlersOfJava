@@ -16,6 +16,8 @@ import javafx.scene.text.Text;
 import settlersofjava.player.Player;
 import settlersofjava.resources.ResourceType;
 
+import java.util.function.Consumer;
+
 /**
  * Bottom HUD panel. Shows the active player's color icon + name on the left,
  * and their resource hand (cards) on the right.
@@ -29,6 +31,8 @@ public class PlayerDashboard extends HBox {
     private final Text    iconInitial;
     private final Label   nameLabel;
     private final HBox    cardsBox;
+
+    private Consumer<ResourceType> onResourceCardClick;
 
     public PlayerDashboard() {
         setSpacing(16);
@@ -65,6 +69,10 @@ public class PlayerDashboard extends HBox {
      * Updates the icon color + initial, and rebuilds the card row bound
      * to the new player's resource map.
      */
+    public void setOnResourceCardClick(Consumer<ResourceType> handler) {
+        this.onResourceCardClick = handler;
+    }
+
     public void switchToPlayer(Player player) {
         iconCircle.setFill(BoardView.playerColor(player.getColor()));
         iconInitial.setText(String.valueOf(player.getName().charAt(0)).toUpperCase());
@@ -72,7 +80,7 @@ public class PlayerDashboard extends HBox {
 
         cardsBox.getChildren().clear();
         for (ResourceType type : ResourceType.values()) {
-            cardsBox.getChildren().add(new ResourceCardView(player, type));
+            cardsBox.getChildren().add(new ResourceCardView(player, type, onResourceCardClick));
         }
     }
 }

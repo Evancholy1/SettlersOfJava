@@ -21,6 +21,8 @@ public class BoardState {
     // Reverse map: each vertex to the tiles it touches (up to 3)
     private final Map<Vertex, List<HexTile>> vertexToTiles;
 
+    private HexTile robberTile;
+
     // Package-private: only BoardBuilder should call this
     BoardState(List<HexTile> tiles,
                List<Vertex> vertices,
@@ -32,6 +34,18 @@ public class BoardState {
         this.edges = List.copyOf(edges);
         this.tileToVertices = Map.copyOf(tileToVertices);
         this.vertexToTiles = Map.copyOf(vertexToTiles);
+        // Robber starts on whichever tile is initially blocked (the desert)
+        this.robberTile = this.tiles.stream().filter(HexTile::isBlocked).findFirst().orElse(null);
+    }
+
+    public HexTile getRobberTile() { return robberTile; }
+
+    public void moveRobber(HexTile newTile) {
+        if (robberTile instanceof ResourceTile rt) rt.setRobberPresent(false);
+        if (robberTile instanceof DesertTile   dt) dt.setRobberPresent(false);
+        if (newTile   instanceof ResourceTile rt) rt.setRobberPresent(true);
+        if (newTile   instanceof DesertTile   dt) dt.setRobberPresent(true);
+        robberTile = newTile;
     }
 
     public List<HexTile> getTiles()     { return tiles; }

@@ -3,6 +3,7 @@ package settlersofjava.ui;
 import javafx.collections.MapChangeListener;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.scene.Cursor;
 import javafx.scene.control.Label;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
@@ -11,6 +12,8 @@ import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import settlersofjava.player.Player;
 import settlersofjava.resources.ResourceType;
+
+import java.util.function.Consumer;
 
 /**
  * PATTERN: Observer (via JavaFX ObservableMap listener)
@@ -21,6 +24,10 @@ import settlersofjava.resources.ResourceType;
 public class ResourceCardView extends VBox {
 
     public ResourceCardView(Player player, ResourceType type) {
+        this(player, type, null);
+    }
+
+    public ResourceCardView(Player player, ResourceType type, Consumer<ResourceType> onClick) {
         setAlignment(Pos.CENTER);
         setSpacing(4);
         setPadding(new Insets(6));
@@ -46,7 +53,13 @@ public class ResourceCardView extends VBox {
             countLabel.setText("x" + count);
             boolean visible = count > 0;
             setVisible(visible);
-            setManaged(visible); // when false, takes up no layout space
+            setManaged(visible);
+            if (onClick != null) {
+                boolean tradeable = count >= 1;
+                card.setStroke(tradeable ? Color.GOLD : Color.BLACK);
+                card.setStrokeWidth(tradeable ? 2.5 : 1.5);
+                setCursor(tradeable ? Cursor.HAND : Cursor.DEFAULT);
+            }
         };
 
         player.resourcesProperty().addListener(
@@ -54,6 +67,17 @@ public class ResourceCardView extends VBox {
                 if (change.getKey() == type) refresh.run();
             }
         );
+
+        if (onClick != null) {
+            setOnMouseClicked(ev -> {
+                if (player.getResource(type) >= 1) onClick.accept(type);
+            });
+            setOnMouseEntered(ev -> {
+                if (player.getResource(type) >= 1)
+                    card.setStyle("-fx-effect: dropshadow(gaussian, gold, 8, 0.6, 0, 0);");
+            });
+            setOnMouseExited(ev -> card.setStyle(""));
+        }
 
         refresh.run(); // set initial state immediately
     }
