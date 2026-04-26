@@ -82,13 +82,21 @@ public class PlayerTradeOffer {
      * Throws if the acceptor never responded ACCEPTED.
      */
     public void execute(Player acceptor) {
+        execute(acceptor, false);
+    }
+
+    /**
+     * @param proposerAlreadyPaid when true, skip removing the proposer's offered resources
+     *                            (they were already removed during UI staging).
+     */
+    public void execute(Player acceptor, boolean proposerAlreadyPaid) {
         if (getResponse(acceptor) != Response.ACCEPTED)
             throw new IllegalStateException(acceptor.getName() + " did not accept this offer");
 
-        offering.forEach((type, amount) -> {
-            proposer.removeResource(type, amount);
-            acceptor.addResource(type, amount);
-        });
+        if (!proposerAlreadyPaid) {
+            offering.forEach((type, amount) -> proposer.removeResource(type, amount));
+        }
+        offering.forEach((type, amount)   -> acceptor.addResource(type, amount));
         requesting.forEach((type, amount) -> {
             acceptor.removeResource(type, amount);
             proposer.addResource(type, amount);

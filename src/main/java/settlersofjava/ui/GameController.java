@@ -66,7 +66,6 @@ public class GameController implements GameEventListener {
     private int largestArmySize = 2;
 
     // ── Player trade panels + state ───────────────────────────────────────────
-    private PlayerTradeOfferPanel    tradeOfferPanel;
     private PlayerTradeResponsePanel tradeResponsePanel;
     private PlayerTradeSelectPanel   tradeSelectPanel;
     private PlayerTradeOffer         pendingOffer;
@@ -138,35 +137,40 @@ public class GameController implements GameEventListener {
 
     public void setTradingPanel(TradingPanel panel) {
         this.tradingPanel = panel;
+        panel.setOnBankTrade(this::executeBankTrade);
+        panel.setOnPropose(this::submitPlayerOffer);
+        panel.setOnCancel(() -> {});
     }
 
-    public void setPlayerTradePanels(PlayerTradeOfferPanel offer,
-                                     PlayerTradeResponsePanel response,
+    public void setPlayerTradePanels(PlayerTradeResponsePanel response,
                                      PlayerTradeSelectPanel select) {
-        this.tradeOfferPanel    = offer;
         this.tradeResponsePanel = response;
         this.tradeSelectPanel   = select;
-
-        offer.setOnPropose(this::submitPlayerOffer);
-        offer.setOnCancel(this::cancelPlayerTrade);
         response.setOnRespond(this::recordTradeResponse);
         select.setOnExecute(this::executePlayerTrade);
         select.setOnCancel(this::cancelPlayerTrade);
     }
 
-    public void openPlayerTrade() {
-        if (turnManager.getPhase() != GamePhase.BUILD) return;
-        if (tradingPanel != null) tradingPanel.reset();
-        if (tradeOfferPanel != null) tradeOfferPanel.show(turnManager.getCurrentPlayer());
+    private void executeBankTrade(Map<ResourceType, Integer> given, ResourceType receiveType) {
+        Player current = turnManager.getCurrentPlayer();
+        current.addResource(receiveType, 1);
+        given.forEach((giveType, count) -> {
+            int rate = getBestRate(current, giveType);
+            String rateStr = rate == 4 ? "Bank 4:1" : "Port " + rate + ":1";
+            log(seg(current.getName(), logColor(current)),
+                seg(" traded " + count + " ", Color.web("#444444")),
+                seg(capitalize(giveType.name().toLowerCase()), resourceColor(giveType)),
+                seg(" for 1 ", Color.web("#444444")),
+                seg(capitalize(receiveType.name().toLowerCase()), resourceColor(receiveType)),
+                seg(" (" + rateStr + ")", Color.web("#888888")));
+        });
+        updateDashboard();
     }
 
     private void submitPlayerOffer(Map<ResourceType, Integer> offering,
                                    Map<ResourceType, Integer> requesting) {
         Player proposer = turnManager.getCurrentPlayer();
         pendingOffer = new PlayerTradeOffer(proposer, offering, requesting);
-        if (!pendingOffer.isValidOffer()) return;
-
-        tradeOfferPanel.hide();
         tradeResponders   = playerList.getAll().stream().filter(p -> p != proposer).toList();
         tradeResponderIdx = 0;
         advanceTradeResponse();
@@ -178,7 +182,8 @@ public class GameController implements GameEventListener {
             List<Player> acceptors = pendingOffer.getAcceptors();
             if (acceptors.isEmpty()) {
                 log(LogEntry.plain("No one accepted the trade offer.", Color.web("#888888")));
-                pendingOffer  = null;
+                pendingOffer.getOffering().forEach((t, n) -> pendingOffer.getProposer().addResource(t, n));
+                pendingOffer    = null;
                 tradeResponders = null;
             } else {
                 tradeSelectPanel.show(pendingOffer, acceptors);
@@ -196,7 +201,7 @@ public class GameController implements GameEventListener {
 
     private void executePlayerTrade(Player acceptor) {
         Player proposer = pendingOffer.getProposer();
-        pendingOffer.execute(acceptor);
+        pendingOffer.execute(acceptor, true); // proposer's offering already removed during staging
 
         // Log offering and requesting sides
         List<LogEntry.Segment> segs = new ArrayList<>();
@@ -212,7 +217,9 @@ public class GameController implements GameEventListener {
     }
 
     private void cancelPlayerTrade() {
-        if (tradeOfferPanel    != null) tradeOfferPanel.hide();
+        if (pendingOffer != null) {
+            pendingOffer.getOffering().forEach((t, n) -> pendingOffer.getProposer().addResource(t, n));
+        }
         if (tradeResponsePanel != null) tradeResponsePanel.hide();
         if (tradeSelectPanel   != null) tradeSelectPanel.hide();
         pendingOffer    = null;
@@ -779,7 +786,7 @@ public class GameController implements GameEventListener {
         if (turnManager.getPhase() != GamePhase.BUILD) return;
         Player current = turnManager.getCurrentPlayer();
         if (current.getResource(giveType) < 1) return;
-        if (tradingPanel != null) tradingPanel.stageOne(giveType, current, getBestRate(current, giveType));
+        if (tradingPanel != null) tradingPanel.stageResource(giveType, current, getBestRate(current, giveType));
     }
 
     private int getBestRate(Player player, ResourceType type) {

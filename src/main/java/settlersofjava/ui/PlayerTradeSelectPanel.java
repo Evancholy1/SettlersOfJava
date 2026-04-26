@@ -47,10 +47,8 @@ public class PlayerTradeSelectPanel extends HBox {
                 + "-fx-background-radius: 8; -fx-pref-width: 90; -fx-pref-height: 40;");
         cancelBtn.setOnAction(e -> { if (onCancel != null) onCancel.run(); });
 
-        Region spacer = new Region();
-        HBox.setHgrow(spacer, Priority.ALWAYS);
-
-        getChildren().addAll(headerLabel, acceptorRow, spacer, cancelBtn);
+        getChildren().addAll(headerLabel, acceptorRow, cancelBtn);
+        setMaxWidth(Region.USE_PREF_SIZE);
     }
 
     // ── Public API ────────────────────────────────────────────────────────────

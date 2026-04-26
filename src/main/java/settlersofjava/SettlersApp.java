@@ -23,7 +23,6 @@ import javafx.scene.text.Font;
 import settlersofjava.engine.CatanGame;
 import settlersofjava.ui.DiceView;
 import settlersofjava.ui.GameLogPanel;
-import settlersofjava.ui.PlayerTradeOfferPanel;
 import settlersofjava.ui.PlayerTradeResponsePanel;
 import settlersofjava.ui.PlayerTradeSelectPanel;
 import settlersofjava.ui.TradingPanel;
@@ -59,6 +58,24 @@ public class SettlersApp extends Application {
 
         Label title = new Label("Welcome to Settlers Of Java");
         title.setFont(new Font("System Bold", 24));
+
+        // ── Player count selector ─────────────────────────────────────────────
+        final int[] playerCount = {4};
+
+        String selectedStyle   = "-fx-background-color: #1565C0; -fx-text-fill: white; -fx-font-weight: bold; -fx-background-radius: 8; -fx-pref-width: 110; -fx-pref-height: 36;";
+        String unselectedStyle = "-fx-background-color: #CFD8DC; -fx-text-fill: #37474F; -fx-font-weight: bold; -fx-background-radius: 8; -fx-pref-width: 110; -fx-pref-height: 36;";
+
+        Button btn3 = new Button("3 Players");
+        Button btn4 = new Button("4 Players");
+        btn3.setFont(new Font(13));
+        btn4.setFont(new Font(13));
+        btn3.setStyle(unselectedStyle);
+        btn4.setStyle(selectedStyle);
+
+        HBox countRow = new HBox(10, btn3, btn4);
+        countRow.setAlignment(Pos.CENTER);
+
+        // ── Name inputs ───────────────────────────────────────────────────────
         TextField p1Input = new TextField("Player 1");
         TextField p2Input = new TextField("Player 2");
         TextField p3Input = new TextField("Player 3");
@@ -67,10 +84,28 @@ public class SettlersApp extends Application {
         p2Input.setMaxWidth(200);
         p3Input.setMaxWidth(200);
         p4Input.setMaxWidth(200);
+
+        btn3.setOnAction(e -> {
+            playerCount[0] = 3;
+            btn3.setStyle(selectedStyle);
+            btn4.setStyle(unselectedStyle);
+            p4Input.setVisible(false);
+            p4Input.setManaged(false);
+        });
+        btn4.setOnAction(e -> {
+            playerCount[0] = 4;
+            btn4.setStyle(selectedStyle);
+            btn3.setStyle(unselectedStyle);
+            p4Input.setVisible(true);
+            p4Input.setManaged(true);
+        });
+
         Button startButton = new Button("Start Game");
         startButton.setFont(new Font(16));
         setupLayout.getChildren().addAll(
                 title,
+                new Label("Number of Players:"),
+                countRow,
                 new Label("Enter Player Names:"),
                 p1Input, p2Input, p3Input, p4Input,
                 startButton
@@ -79,12 +114,9 @@ public class SettlersApp extends Application {
 
         // Start Button Logic
         startButton.setOnAction(e -> {
-            List<String> names = List.of(
-                    p1Input.getText(),
-                    p2Input.getText(),
-                    p3Input.getText(),
-                    p4Input.getText()
-            );
+            List<String> names = playerCount[0] == 3
+                    ? List.of(p1Input.getText(), p2Input.getText(), p3Input.getText())
+                    : List.of(p1Input.getText(), p2Input.getText(), p3Input.getText(), p4Input.getText());
 
             CatanGame game = CatanGame.getInstance(names);
 
@@ -119,11 +151,7 @@ public class SettlersApp extends Application {
             topBar.setAlignment(Pos.CENTER_LEFT);
             topBar.setPadding(new Insets(8, 20, 4, 20));
 
-            Button tradeButton = new Button("Trade w/ Players");
-            tradeButton.setFont(new Font(14));
-            tradeButton.setStyle("-fx-background-color: #1976D2; -fx-text-fill: white; -fx-font-weight: bold;");
-
-            HBox buildBar = new HBox(12, buildRoadButton, buildSettlementButton, buildCityButton, buildDevCardButton, tradeButton);
+            HBox buildBar = new HBox(12, buildRoadButton, buildSettlementButton, buildCityButton, buildDevCardButton);
             buildBar.setAlignment(Pos.CENTER_LEFT);
             buildBar.setPadding(new Insets(4, 20, 8, 20));
 
@@ -131,7 +159,6 @@ public class SettlersApp extends Application {
 
             PlayerDashboard dashboard = new PlayerDashboard();
             TradingPanel tradingPanel = new TradingPanel();
-            PlayerTradeOfferPanel tradeOfferPanel       = new PlayerTradeOfferPanel();
             PlayerTradeResponsePanel tradeResponsePanel = new PlayerTradeResponsePanel();
             PlayerTradeSelectPanel tradeSelectPanel     = new PlayerTradeSelectPanel();
 
@@ -145,7 +172,7 @@ public class SettlersApp extends Application {
             gameLayout.setStyle("-fx-background-color: #1565C0;");
             gameLayout.setTop(topArea);
             gameLayout.setCenter(boardStack);
-            gameLayout.setBottom(new VBox(tradingPanel, tradeOfferPanel, tradeResponsePanel, tradeSelectPanel, dashboard));
+            gameLayout.setBottom(new VBox(tradingPanel, tradeResponsePanel, tradeSelectPanel, dashboard));
             gameLayout.setRight(new GameLogPanel());
 
             GameController controller = new GameController(
@@ -159,9 +186,8 @@ public class SettlersApp extends Application {
             controller.setBoardView(boardView);
             controller.setPlayerDashboard(dashboard);
             controller.setTradingPanel(tradingPanel);
-            controller.setPlayerTradePanels(tradeOfferPanel, tradeResponsePanel, tradeSelectPanel);
+            controller.setPlayerTradePanels(tradeResponsePanel, tradeSelectPanel);
 
-            tradeButton.setOnAction(ev           -> controller.openPlayerTrade());
             rollButton.setOnAction(ev            -> controller.rollDice());
             endTurnButton.setOnAction(ev        -> controller.endTurn());
             buildRoadButton.setOnAction(ev      -> controller.toggleBuildRoad());

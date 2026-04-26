@@ -13,254 +13,335 @@ import javafx.scene.text.FontWeight;
 import settlersofjava.player.Player;
 import settlersofjava.resources.ResourceType;
 
+import java.util.ArrayList;
+import java.util.EnumMap;
+import java.util.List;
+import java.util.Map;
+import java.util.function.BiConsumer;
+
 /**
- * Inline staging panel that appears above the PlayerDashboard when a player
- * initiates a bank trade.
+ * Unified trade panel — bank/port and player-to-player in one UI.
  *
- * Flow:
- *   1. Player clicks a resource card in their hand  → stageOne() is called.
- *   2. Each additional click on that card adds one more to the staging area.
- *   3. Clicking a staged card returns one resource to the player's hand.
- *   4. Player clicks a receive-pool card to select what they want back.
- *   5. ✓ confirms (adds receive resource to player), ✕ cancels (returns all staged).
+ * Layout:
+ *   ┌─ top pool row ──────────────────────────────── ┐ │ buttons │
+ *   │  [Wd] [Bk] [Sh] [Wh] [Or]  ← click to request │ │ [Bank]  │
+ *   ├─ ▼ Receiving ───────────────────────────────── ┤ │[Players]│
+ *   │  (receive mini cards — click to remove)         │ │  [✕]   │
+ *   ├─ ▲ Offering ────────────────────────────────── ┤ │         │
+ *   │  (staged give cards — click to unstage)         │ └─────────┘
+ *   └─────────────────────────────────────────────────┘
  *
- * Resources are temporarily removed from the player's ObservableMap while
- * staged so the dashboard counts update in real time, and restored on cancel.
+ * Give side: clicking a hand card calls stageResource() which removes it from
+ * the player's ObservableMap (staging). Cleared panel returns them automatically.
+ *
+ * Receive side: clicking the top pool adds a card; clicking a receive card removes it.
+ * No spinners — same click-to-add / click-to-remove mechanic on both sides.
+ *
+ * On "🤝 Players": staged give resources are NOT returned — GameController must
+ * restore them from pendingOffer.getOffering() if the trade is cancelled.
  */
 public class TradingPanel extends HBox {
 
-    private Player       currentPlayer;
-    private ResourceType giveType   = null;
-    private int          giveCount  = 0;
-    private int          tradeRate  = 4;
-    private ResourceType receiveType = null;
+    private static final ResourceType[] TYPES = ResourceType.values();
 
-    private final HBox  giveMiniBox;
-    private final HBox  receiveOptionBox;
-    private final Button confirmBtn;
-    private final Label  giveCountLabel;
-    private final Label  bankLabel;
+    private Player currentPlayer;
+    private final Map<ResourceType, Integer> givingStaged = new EnumMap<>(ResourceType.class);
+    private final List<ResourceType>         receivingList = new ArrayList<>();
+    private final Map<ResourceType, Integer> bestRates    = new EnumMap<>(ResourceType.class);
+
+    private final HBox giveCardRow;
+    private final HBox receiveCardRow;
+    private final Label giveHint;
+    private final Label receiveHint;
+
+    private final Button bankBtn;
+    private final Button proposeBtn;
+
+    private BiConsumer<Map<ResourceType, Integer>, ResourceType>               onBankTrade;
+    private BiConsumer<Map<ResourceType, Integer>, Map<ResourceType, Integer>> onPropose;
+    private Runnable onCancel;
 
     public TradingPanel() {
         setVisible(false);
         setManaged(false);
-
         setStyle("-fx-background-color: #263238;");
-        setPadding(new Insets(10, 16, 10, 16));
-        setSpacing(20);
+        setPadding(new Insets(8, 14, 8, 14));
+        setSpacing(14);
         setAlignment(Pos.CENTER_LEFT);
 
-        // ── Bank partner label ──────────────────────────────────────────────
-        VBox bankSection = new VBox(4);
-        bankSection.setAlignment(Pos.CENTER);
-        Label bankIcon  = new Label("🏦");
-        bankIcon.setFont(Font.font(22));
-        bankLabel = new Label("Bank 4:1");
-        bankLabel.setFont(Font.font("System", FontWeight.BOLD, 10));
-        bankLabel.setTextFill(Color.LIGHTGRAY);
-        bankSection.getChildren().addAll(bankIcon, bankLabel);
+        // ── Top pool row (infinite receive picker) ────────────────────────────
+        HBox poolRow = new HBox(8);
+        poolRow.setAlignment(Pos.CENTER_LEFT);
+        for (ResourceType type : TYPES) {
+            VBox card = poolCard(type);
+            card.setOnMouseClicked(e -> addReceive(type));
+            card.setCursor(Cursor.HAND);
+            poolRow.getChildren().add(card);
+        }
+        Label poolHdr = new Label("Request →");
+        poolHdr.setFont(Font.font("System", FontWeight.BOLD, 10));
+        poolHdr.setTextFill(Color.web("#90A4AE"));
+        HBox poolSection = new HBox(8, poolHdr, poolRow);
+        poolSection.setAlignment(Pos.CENTER_LEFT);
 
-        // ── Give section ────────────────────────────────────────────────────
-        VBox giveSection = new VBox(4);
-        giveSection.setAlignment(Pos.CENTER_LEFT);
+        // ── Receive row (▼ green) ─────────────────────────────────────────────
+        Label recArrow = new Label("▼");
+        recArrow.setFont(Font.font("System", FontWeight.BOLD, 15));
+        recArrow.setTextFill(Color.SEAGREEN);
+        receiveCardRow = new HBox(4);
+        receiveCardRow.setAlignment(Pos.CENTER_LEFT);
+        receiveCardRow.setMinWidth(200);
+        receiveHint = new Label("click above to add");
+        receiveHint.setFont(Font.font("System", 10));
+        receiveHint.setTextFill(Color.web("#546E7A"));
+        HBox receiveRow = new HBox(6, recArrow, receiveCardRow, receiveHint);
+        receiveRow.setAlignment(Pos.CENTER_LEFT);
 
-        HBox giveTitleRow = new HBox(6);
-        giveTitleRow.setAlignment(Pos.CENTER_LEFT);
+        // ── Give row (▲ red) ──────────────────────────────────────────────────
         Label giveArrow = new Label("▲");
-        giveArrow.setFont(Font.font("System", FontWeight.BOLD, 13));
+        giveArrow.setFont(Font.font("System", FontWeight.BOLD, 15));
         giveArrow.setTextFill(Color.FIREBRICK);
-        giveCountLabel = new Label("Give 0/4");
-        giveCountLabel.setFont(Font.font("System", FontWeight.BOLD, 11));
-        giveCountLabel.setTextFill(Color.LIGHTGRAY);
-        giveTitleRow.getChildren().addAll(giveArrow, giveCountLabel);
+        giveCardRow = new HBox(4);
+        giveCardRow.setAlignment(Pos.CENTER_LEFT);
+        giveCardRow.setMinWidth(200);
+        giveHint = new Label("click cards in your hand");
+        giveHint.setFont(Font.font("System", 10));
+        giveHint.setTextFill(Color.web("#546E7A"));
+        HBox giveRow = new HBox(6, giveArrow, giveCardRow, giveHint);
+        giveRow.setAlignment(Pos.CENTER_LEFT);
 
-        giveMiniBox = new HBox(4);
-        giveMiniBox.setAlignment(Pos.CENTER_LEFT);
-        giveMiniBox.setMinWidth(160);
-        giveSection.getChildren().addAll(giveTitleRow, giveMiniBox);
+        // ── Stack: pool / receive / give ──────────────────────────────────────
+        VBox mainStack = new VBox(6, poolSection, receiveRow, giveRow);
+        mainStack.setAlignment(Pos.CENTER_LEFT);
 
-        // ── Receive section ─────────────────────────────────────────────────
-        VBox receiveSection = new VBox(4);
-        receiveSection.setAlignment(Pos.CENTER_LEFT);
+        // ── Buttons ───────────────────────────────────────────────────────────
+        bankBtn = new Button("🏦 Bank");
+        bankBtn.setFont(Font.font("System", FontWeight.BOLD, 11));
+        bankBtn.setStyle("-fx-background-color: #546E7A; -fx-text-fill: white;"
+                + "-fx-background-radius: 8; -fx-pref-width: 100; -fx-pref-height: 32;");
+        bankBtn.setDisable(true);
+        bankBtn.setOnAction(e -> doBankTrade());
 
-        HBox receiveTitleRow = new HBox(6);
-        receiveTitleRow.setAlignment(Pos.CENTER_LEFT);
-        Label receiveArrow = new Label("▼");
-        receiveArrow.setFont(Font.font("System", FontWeight.BOLD, 13));
-        receiveArrow.setTextFill(Color.SEAGREEN);
-        Label receiveLabel = new Label("Receive 1");
-        receiveLabel.setFont(Font.font("System", FontWeight.BOLD, 11));
-        receiveLabel.setTextFill(Color.LIGHTGRAY);
-        receiveTitleRow.getChildren().addAll(receiveArrow, receiveLabel);
-
-        receiveOptionBox = new HBox(6);
-        receiveOptionBox.setAlignment(Pos.CENTER_LEFT);
-        buildReceiveOptions();
-        receiveSection.getChildren().addAll(receiveTitleRow, receiveOptionBox);
-
-        // ── Confirm / cancel ────────────────────────────────────────────────
-        confirmBtn = new Button("✓");
-        confirmBtn.setFont(Font.font("System", FontWeight.BOLD, 18));
-        confirmBtn.setStyle("-fx-background-color: #4CAF50; -fx-text-fill: white;"
-                + "-fx-background-radius: 8; -fx-pref-width: 46; -fx-pref-height: 46;");
-        confirmBtn.setDisable(true);
-        confirmBtn.setOnAction(e -> confirmTrade());
+        proposeBtn = new Button("🤝 Players");
+        proposeBtn.setFont(Font.font("System", FontWeight.BOLD, 11));
+        proposeBtn.setStyle("-fx-background-color: #1976D2; -fx-text-fill: white;"
+                + "-fx-background-radius: 8; -fx-pref-width: 100; -fx-pref-height: 32;");
+        proposeBtn.setDisable(true);
+        proposeBtn.setOnAction(e -> doPropose());
 
         Button cancelBtn = new Button("✕");
-        cancelBtn.setFont(Font.font("System", FontWeight.BOLD, 18));
+        cancelBtn.setFont(Font.font("System", FontWeight.BOLD, 14));
         cancelBtn.setStyle("-fx-background-color: #e53935; -fx-text-fill: white;"
-                + "-fx-background-radius: 8; -fx-pref-width: 46; -fx-pref-height: 46;");
+                + "-fx-background-radius: 8; -fx-pref-width: 36; -fx-pref-height: 36;");
         cancelBtn.setOnAction(e -> cancelTrade());
 
-        VBox buttonBox = new VBox(8, confirmBtn, cancelBtn);
-        buttonBox.setAlignment(Pos.CENTER);
+        VBox btnBox = new VBox(5, bankBtn, proposeBtn, cancelBtn);
+        btnBox.setAlignment(Pos.CENTER);
 
-        Region spacer = new Region();
-        HBox.setHgrow(spacer, Priority.ALWAYS);
-
-        VBox tradeStack = new VBox(8, receiveSection, giveSection);
-        tradeStack.setAlignment(Pos.CENTER_LEFT);
-
-        getChildren().addAll(bankSection, tradeStack, spacer, buttonBox);
+        getChildren().addAll(mainStack, btnBox);
+        setMaxWidth(Region.USE_PREF_SIZE);
     }
 
     // ── Public API ────────────────────────────────────────────────────────────
 
-    /**
-     * Called by GameController when the player clicks a resource card.
-     * Switching to a different resource type while staging automatically
-     * returns the previously staged cards.
-     */
-    public void stageOne(ResourceType type, Player player, int rate) {
-        if (player.getResource(type) <= 0) return;
-
-        // Switching type: return everything staged so far and adopt new rate
-        if (giveType != null && type != giveType) {
-            player.addResource(giveType, giveCount);
-            giveCount = 0;
-            giveType  = null;
-        }
-
-        tradeRate = rate;
-        bankLabel.setText(rate == 4 ? "Bank 4:1" : "Port " + rate + ":1");
-
-        if (giveCount >= tradeRate) return;
-
-        currentPlayer = player;
-        giveType      = type;
-        player.removeResource(type, 1);
-        giveCount++;
-
-        setVisible(true);
-        setManaged(true);
-        rebuild();
+    public void setOnBankTrade(BiConsumer<Map<ResourceType, Integer>, ResourceType> cb) {
+        this.onBankTrade = cb;
     }
 
-    /** Return all staged resources and hide the panel (called on turn end or cancel). */
+    public void setOnPropose(BiConsumer<Map<ResourceType, Integer>, Map<ResourceType, Integer>> cb) {
+        this.onPropose = cb;
+    }
+
+    public void setOnCancel(Runnable cb) {
+        this.onCancel = cb;
+    }
+
+    public void stageResource(ResourceType type, Player player, int rate) {
+        if (player.getResource(type) <= 0) return;
+        currentPlayer = player;
+        bestRates.put(type, rate);
+        player.removeResource(type, 1);
+        givingStaged.merge(type, 1, Integer::sum);
+        setVisible(true);
+        setManaged(true);
+        refresh();
+    }
+
     public void reset() {
-        if (currentPlayer != null && giveType != null && giveCount > 0)
-            currentPlayer.addResource(giveType, giveCount);
+        if (currentPlayer != null) {
+            givingStaged.forEach((t, n) -> currentPlayer.addResource(t, n));
+        }
         clearState();
     }
 
     // ── Internal ─────────────────────────────────────────────────────────────
 
-    private void unstageOne() {
-        if (giveCount <= 0 || currentPlayer == null) return;
-        currentPlayer.addResource(giveType, 1);
-        giveCount--;
-        if (giveCount == 0) {
-            giveType = null;
-            clearState();
-            return;
-        }
-        rebuild();
+    private void addReceive(ResourceType type) {
+        receivingList.add(type);
+        refresh();
     }
 
-    private void confirmTrade() {
-        if (receiveType == null || giveCount < tradeRate || currentPlayer == null) return;
-        currentPlayer.addResource(receiveType, 1);
+    private void removeReceive(int index) {
+        if (index >= 0 && index < receivingList.size()) {
+            receivingList.remove(index);
+            refresh();
+        }
+    }
+
+    private void unstageOne(ResourceType type) {
+        if (!givingStaged.containsKey(type) || currentPlayer == null) return;
+        currentPlayer.addResource(type, 1);
+        int remaining = givingStaged.merge(type, -1, Integer::sum);
+        if (remaining <= 0) givingStaged.remove(type);
+        if (givingStaged.isEmpty() && receivingList.isEmpty()) { clearState(); return; }
+        refresh();
+    }
+
+    private void doBankTrade() {
+        if (!canBankTrade()) return;
+        ResourceType receiveType = receivingList.get(0);
+        Map<ResourceType, Integer> givingCopy = new EnumMap<>(givingStaged);
         clearState();
+        if (onBankTrade != null) onBankTrade.accept(givingCopy, receiveType);
+    }
+
+    private void doPropose() {
+        if (!canPropose()) return;
+        Map<ResourceType, Integer> givingCopy    = new EnumMap<>(givingStaged);
+        Map<ResourceType, Integer> requestingMap = new EnumMap<>(ResourceType.class);
+        for (ResourceType t : receivingList) requestingMap.merge(t, 1, Integer::sum);
+        clearState(); // staged resources consumed — not returned
+        if (onPropose != null) onPropose.accept(givingCopy, requestingMap);
     }
 
     private void cancelTrade() {
         reset();
+        if (onCancel != null) onCancel.run();
+    }
+
+    private boolean canBankTrade() {
+        if (givingStaged.size() != 1) return false;
+        Map.Entry<ResourceType, Integer> e = givingStaged.entrySet().iterator().next();
+        int rate = bestRates.getOrDefault(e.getKey(), 4);
+        if (!e.getValue().equals(rate)) return false;
+        if (receivingList.size() != 1) return false;
+        return receivingList.get(0) != e.getKey();
+    }
+
+    private boolean canPropose() {
+        return !givingStaged.isEmpty() && !receivingList.isEmpty();
+    }
+
+    private void refresh() {
+        // Give cards
+        giveCardRow.getChildren().clear();
+        List<Map.Entry<ResourceType, Integer>> entries = new ArrayList<>(givingStaged.entrySet());
+        for (Map.Entry<ResourceType, Integer> entry : entries) {
+            for (int i = 0; i < entry.getValue(); i++) {
+                VBox card = miniCard(entry.getKey());
+                final ResourceType t = entry.getKey();
+                card.setOnMouseClicked(e -> unstageOne(t));
+                card.setCursor(Cursor.HAND);
+                card.setStyle("-fx-effect: dropshadow(gaussian, rgba(255,80,80,0.4), 5, 0, 0, 0);");
+                giveCardRow.getChildren().add(card);
+            }
+        }
+        boolean giveEmpty = givingStaged.isEmpty();
+        giveHint.setVisible(giveEmpty);
+        giveHint.setManaged(giveEmpty);
+
+        // Receive cards
+        receiveCardRow.getChildren().clear();
+        for (int i = 0; i < receivingList.size(); i++) {
+            VBox card = miniCard(receivingList.get(i));
+            final int idx = i;
+            card.setOnMouseClicked(e -> removeReceive(idx));
+            card.setCursor(Cursor.HAND);
+            card.setStyle("-fx-effect: dropshadow(gaussian, rgba(80,200,80,0.4), 5, 0, 0, 0);");
+            receiveCardRow.getChildren().add(card);
+        }
+        boolean recEmpty = receivingList.isEmpty();
+        receiveHint.setVisible(recEmpty);
+        receiveHint.setManaged(recEmpty);
+
+        // Bank button label
+        if (givingStaged.size() == 1) {
+            ResourceType gt = givingStaged.keySet().iterator().next();
+            int rate        = bestRates.getOrDefault(gt, 4);
+            int staged      = givingStaged.get(gt);
+            String rateStr  = rate == 4 ? "4:1" : "Port " + rate + ":1";
+            bankBtn.setText("🏦 " + rateStr + " (" + staged + "/" + rate + ")");
+        } else {
+            bankBtn.setText("🏦 Bank");
+        }
+
+        bankBtn.setDisable(!canBankTrade());
+        proposeBtn.setDisable(!canPropose());
     }
 
     private void clearState() {
-        giveType      = null;
-        giveCount     = 0;
-        receiveType   = null;
+        givingStaged.clear();
+        receivingList.clear();
+        bestRates.clear();
         currentPlayer = null;
-        giveMiniBox.getChildren().clear();
-        tradeRate = 4;
-        bankLabel.setText("Bank 4:1");
-        giveCountLabel.setText("Give 0/4");
-        buildReceiveOptions();
-        confirmBtn.setDisable(true);
+        giveCardRow.getChildren().clear();
+        receiveCardRow.getChildren().clear();
+        giveHint.setVisible(true);
+        giveHint.setManaged(true);
+        receiveHint.setVisible(true);
+        receiveHint.setManaged(true);
+        bankBtn.setText("🏦 Bank");
+        bankBtn.setDisable(true);
+        proposeBtn.setDisable(true);
         setVisible(false);
         setManaged(false);
     }
 
-    private void rebuild() {
-        // Give cards — click any card to return one to hand
-        giveMiniBox.getChildren().clear();
-        if (giveType != null) {
-            for (int i = 0; i < giveCount; i++) {
-                VBox card = miniCard(giveType);
-                card.setOnMouseClicked(e -> unstageOne());
-                card.setCursor(Cursor.HAND);
-                card.setStyle("-fx-effect: dropshadow(gaussian, rgba(255,255,255,0.25), 4, 0, 0, 0);");
-                giveMiniBox.getChildren().add(card);
-            }
-        }
-        giveCountLabel.setText("Give " + giveCount + "/" + tradeRate);
+    // ── Card builders ─────────────────────────────────────────────────────────
 
-        buildReceiveOptions();
-        confirmBtn.setDisable(giveCount < tradeRate || receiveType == null);
-    }
-
-    private void buildReceiveOptions() {
-        receiveOptionBox.getChildren().clear();
-        for (ResourceType type : ResourceType.values()) {
-            boolean selected   = type == receiveType;
-            boolean isGiveType = type == giveType;
-
-            VBox card = miniCard(type);
-            if (selected) {
-                card.setStyle("-fx-border-color: #fff176; -fx-border-width: 2;"
-                        + "-fx-border-radius: 4; -fx-background-radius: 4;"
-                        + "-fx-background-color: rgba(255,241,118,0.15);");
-            } else if (isGiveType) {
-                card.setOpacity(0.35);
-            }
-
-            final ResourceType t = type;
-            card.setOnMouseClicked(e -> {
-                receiveType = (receiveType == t) ? null : t;
-                buildReceiveOptions();
-                confirmBtn.setDisable(giveCount < tradeRate || receiveType == null);
-            });
-            card.setCursor(Cursor.HAND);
-            receiveOptionBox.getChildren().add(card);
-        }
-    }
-
+    /** Small card shown in give/receive staging areas. */
     private VBox miniCard(ResourceType type) {
-        Rectangle rect = new Rectangle(36, 50);
+        Rectangle rect = new Rectangle(34, 48);
         rect.setFill(resourceColor(type));
         rect.setArcWidth(6);
         rect.setArcHeight(6);
-        rect.setStroke(Color.web("#ffffff", 0.4));
+        rect.setStroke(Color.web("#ffffff", 0.35));
         rect.setStrokeWidth(1.2);
-
-        Label lbl = new Label(type.name());
+        Label lbl = new Label(abbrev(type));
         lbl.setFont(Font.font("System", FontWeight.BOLD, 9));
         lbl.setTextFill(Color.WHITE);
-
         VBox card = new VBox(2, rect, lbl);
         card.setAlignment(Pos.CENTER);
         return card;
+    }
+
+    /** Slightly larger card for the top infinite pool row. */
+    private VBox poolCard(ResourceType type) {
+        Rectangle rect = new Rectangle(38, 52);
+        rect.setFill(resourceColor(type));
+        rect.setArcWidth(7);
+        rect.setArcHeight(7);
+        rect.setStroke(Color.web("#ffffff", 0.5));
+        rect.setStrokeWidth(1.5);
+        Label lbl = new Label(abbrev(type));
+        lbl.setFont(Font.font("System", FontWeight.BOLD, 10));
+        lbl.setTextFill(Color.WHITE);
+        VBox card = new VBox(2, rect, lbl);
+        card.setAlignment(Pos.CENTER);
+        card.setOnMouseEntered(e ->
+            rect.setStyle("-fx-effect: dropshadow(gaussian, white, 6, 0.5, 0, 0);"));
+        card.setOnMouseExited(e -> rect.setStyle(""));
+        return card;
+    }
+
+    private String abbrev(ResourceType t) {
+        return switch (t) {
+            case WOOD  -> "Wd";
+            case BRICK -> "Bk";
+            case SHEEP -> "Sh";
+            case WHEAT -> "Wh";
+            case ORE   -> "Or";
+        };
     }
 
     private Color resourceColor(ResourceType type) {

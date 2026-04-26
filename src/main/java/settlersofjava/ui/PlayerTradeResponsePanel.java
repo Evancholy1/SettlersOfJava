@@ -1,14 +1,18 @@
 package settlersofjava.ui;
 
 import javafx.geometry.Insets;
+import javafx.geometry.Orientation;
 import javafx.geometry.Pos;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
+import javafx.scene.control.Separator;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
+import javafx.scene.shape.Circle;
 import javafx.scene.shape.Rectangle;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
+import javafx.scene.text.Text;
 import settlersofjava.player.Player;
 import settlersofjava.resources.ResourceType;
 import settlersofjava.trade.PlayerTradeOffer;
@@ -22,12 +26,14 @@ import java.util.function.BiConsumer;
  */
 public class PlayerTradeResponsePanel extends HBox {
 
-    private final Label  headerLabel;
+    private final Circle playerCircle;
+    private final Text   playerInitial;
+    private final Label  playerNameLabel;
     private final HBox   offerBox;
     private final HBox   reqBox;
     private final Button acceptBtn;
 
-    private Player                                    currentResponder;
+    private Player                                        currentResponder;
     private BiConsumer<Player, PlayerTradeOffer.Response> onRespond;
 
     public PlayerTradeResponsePanel() {
@@ -38,10 +44,24 @@ public class PlayerTradeResponsePanel extends HBox {
         setSpacing(18);
         setAlignment(Pos.CENTER_LEFT);
 
-        // ── Header ────────────────────────────────────────────────────────────
-        headerLabel = new Label("Pass to —");
-        headerLabel.setFont(Font.font("System", FontWeight.BOLD, 13));
-        headerLabel.setTextFill(Color.WHITE);
+        // ── Player icon (matches dashboard style) ─────────────────────────────
+        playerCircle = new Circle(20);
+        playerCircle.setFill(Color.LIGHTGRAY);
+        playerCircle.setStroke(Color.WHITE);
+        playerCircle.setStrokeWidth(2);
+
+        playerInitial = new Text("?");
+        playerInitial.setFont(Font.font("System", FontWeight.BOLD, 16));
+        playerInitial.setFill(Color.WHITE);
+
+        StackPane iconPane = new StackPane(playerCircle, playerInitial);
+
+        playerNameLabel = new Label("—");
+        playerNameLabel.setFont(Font.font("System", FontWeight.BOLD, 12));
+        playerNameLabel.setTextFill(Color.WHITE);
+
+        VBox playerBox = new VBox(4, iconPane, playerNameLabel);
+        playerBox.setAlignment(Pos.CENTER);
 
         // ── Offer display ─────────────────────────────────────────────────────
         VBox offerSection = new VBox(3);
@@ -53,7 +73,7 @@ public class PlayerTradeResponsePanel extends HBox {
         offerBox.setAlignment(Pos.CENTER_LEFT);
         offerSection.getChildren().addAll(offerTitle, offerBox);
 
-        Label forLbl = new Label("in exchange for");
+        Label forLbl = new Label("for");
         forLbl.setFont(Font.font("System", 11));
         forLbl.setTextFill(Color.LIGHTGRAY);
 
@@ -82,10 +102,11 @@ public class PlayerTradeResponsePanel extends HBox {
         VBox btnBox = new VBox(8, acceptBtn, declineBtn);
         btnBox.setAlignment(Pos.CENTER);
 
-        Region spacer = new Region();
-        HBox.setHgrow(spacer, Priority.ALWAYS);
+        Separator divider = new Separator(Orientation.VERTICAL);
+        divider.setStyle("-fx-background-color: #90A4AE; -fx-pref-width: 1;");
 
-        getChildren().addAll(headerLabel, offerSection, forLbl, reqSection, spacer, btnBox);
+        getChildren().addAll(playerBox, divider, offerSection, forLbl, reqSection, btnBox);
+        setMaxWidth(Region.USE_PREF_SIZE);
     }
 
     // ── Public API ────────────────────────────────────────────────────────────
@@ -96,12 +117,14 @@ public class PlayerTradeResponsePanel extends HBox {
 
     public void show(PlayerTradeOffer offer, Player responder) {
         this.currentResponder = responder;
-        headerLabel.setText("📨  Pass to " + responder.getName());
 
-        rebuildMinis(offerBox, offer.getOffering());   // what responder receives
-        rebuildMinis(reqBox,   offer.getRequesting()); // what responder must give
+        playerCircle.setFill(BoardView.playerColor(responder.getColor()));
+        playerInitial.setText(String.valueOf(responder.getName().charAt(0)).toUpperCase());
+        playerNameLabel.setText(responder.getName());
 
-        // Accept only enabled if responder can afford what's requested
+        rebuildMinis(offerBox, offer.getOffering());
+        rebuildMinis(reqBox,   offer.getRequesting());
+
         acceptBtn.setDisable(!offer.canAffordToAccept(responder));
 
         setVisible(true);

@@ -440,7 +440,7 @@ public class BoardView extends Pane implements GameEventListener {
             case RED    -> Color.RED;
             case BLUE   -> Color.DODGERBLUE;
             case BLACK  -> Color.BLACK;
-            case ORANGE -> Color.ORANGE;
+            case ORANGE -> Color.web("#E65100");
         };
     }
 }
