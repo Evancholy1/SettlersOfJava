@@ -20,3 +20,18 @@ Feature: Dice rolling and resource distribution
     When the first player's tile token is rolled
     Then only the first player receives a resource
     And the second player receives nothing
+
+  Scenario: Player with less than 8 cards does not discard on a 7
+    Given a player has 7 total resource cards
+    When a 7 is rolled and the discard rule is applied
+    Then the player should have 7 total resource cards left
+
+  Scenario: Player with exactly 8 cards discards half on a 7
+    Given a player has 8 total resource cards
+    When a 7 is rolled and the discard rule is applied
+    Then the player should have 4 total resource cards left
+
+  Scenario: Player with an odd number of cards (9) discards half rounded down on a 7
+    Given a player has 9 total resource cards
+    When a 7 is rolled and the discard rule is applied
+    Then the player should have 5 total resource cards left

@@ -10,5 +10,7 @@ For a detailed breakdown of design patterns used:
 
 **[Read the Design Patterns Documentation](Patterns.MD)**
 
+Note: Claude AI was used for some portions of this project. A large majority being JavaFX for UI design, which was not explicitly taught in this course. Thank you. 
+
 ## Run
 ```./gradlew run```

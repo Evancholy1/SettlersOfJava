@@ -626,6 +626,35 @@ public class GameController implements GameEventListener {
                 seg(" rolled ", Color.web("#444444")),
                 seg("7", Color.FIREBRICK),
                 seg(" — Robber moves!", Color.web("#444444")));
+
+            // players with over 8 cards gets half (rounded down) of their cards randomly discarded
+            for (Player p : playerList.getAll()) {
+                int totalResources = 0;
+                for (ResourceType type : ResourceType.values()) {
+                    totalResources += p.getResource(type);
+                }
+
+                if (totalResources >= 8) {
+                    int toDiscard = totalResources / 2;
+
+                    // pool all resources
+                    List<ResourceType> pool = new ArrayList<>();
+                    for (ResourceType type : ResourceType.values()) {
+                        for (int i = 0; i < p.getResource(type); i++) {
+                            pool.add(type);
+                        }
+                    }
+                    Random rand = new Random();
+                    for (int i = 0; i < toDiscard; i++) {
+                        int index = rand.nextInt(pool.size());
+                        ResourceType typeToDiscard = pool.remove(index);
+                        p.removeResource(typeToDiscard, 1);
+                    }
+
+                    log(seg(p.getName(), logColor(p)),
+                            seg(" had " + totalResources + " cards and discarded " + toDiscard + " due to the robber.", Color.web("#444444")));
+                }
+            }
             robberMode = true;
             updateHighlights();
             updateActionButtons();

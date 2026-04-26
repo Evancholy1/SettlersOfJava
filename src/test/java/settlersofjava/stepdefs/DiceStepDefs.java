@@ -145,4 +145,49 @@ public class DiceStepDefs {
             }
         }
     }
+
+    // ── Discard Rule (7 Rolled) ───────────────────────────────────────────────
+
+    @Given("a player has {int} total resource cards")
+    public void a_player_has_total_resource_cards(int totalCards) {
+        player1 = new Player("Alice", PlayerColor.RED);
+        // give them all WOOD for an easy test pool
+        player1.addResource(ResourceType.WOOD, totalCards);
+    }
+
+    @When("a 7 is rolled and the discard rule is applied")
+    public void a_7_is_rolled_and_discard_applied() {
+        // mirrors the discard logic in GameController.handleDiceRolled
+        int totalResources = 0;
+        for (ResourceType type : ResourceType.values()) {
+            totalResources += player1.getResource(type);
+        }
+
+        if (totalResources >= 8) {
+            int toDiscard = totalResources / 2;
+            java.util.List<ResourceType> pool = new java.util.ArrayList<>();
+            for (ResourceType type : ResourceType.values()) {
+                for (int i = 0; i < player1.getResource(type); i++) {
+                    pool.add(type);
+                }
+            }
+
+            java.util.Random rand = new java.util.Random();
+            for (int i = 0; i < toDiscard; i++) {
+                int index = rand.nextInt(pool.size());
+                ResourceType typeToDiscard = pool.remove(index);
+                player1.removeResource(typeToDiscard, 1);
+            }
+        }
+    }
+
+    @Then("the player should have {int} total resource cards left")
+    public void the_player_should_have_total_resource_cards_left(int expectedRemaining) {
+        int actualRemaining = 0;
+        for (ResourceType type : ResourceType.values()) {
+            actualRemaining += player1.getResource(type);
+        }
+        assertEquals(expectedRemaining, actualRemaining,
+                "Player should have exactly " + expectedRemaining + " cards remaining.");
+    }
 }
