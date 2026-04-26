@@ -5,6 +5,7 @@ import settlersofjava.board.*;
 import settlersofjava.buildings.City;
 import settlersofjava.buildings.Road;
 import settlersofjava.buildings.Settlement;
+import settlersofjava.trade.PlayerTradeOffer;
 import settlersofjava.trade.PortTradeStrategy;
 import settlersofjava.dice.Die;
 import settlersofjava.dice.RandomDie;
@@ -51,6 +52,14 @@ public class GameController implements GameEventListener {
     private BoardView       boardView;
     private PlayerDashboard playerDashboard;
     private TradingPanel    tradingPanel;
+
+    // ── Player trade panels + state ───────────────────────────────────────────
+    private PlayerTradeOfferPanel    tradeOfferPanel;
+    private PlayerTradeResponsePanel tradeResponsePanel;
+    private PlayerTradeSelectPanel   tradeSelectPanel;
+    private PlayerTradeOffer         pendingOffer;
+    private List<Player>             tradeResponders;
+    private int                      tradeResponderIdx;
 
     // ── Action buttons ────────────────────────────────────────────────────────
     private Button rollButton;
@@ -112,6 +121,85 @@ public class GameController implements GameEventListener {
 
     public void setTradingPanel(TradingPanel panel) {
         this.tradingPanel = panel;
+    }
+
+    public void setPlayerTradePanels(PlayerTradeOfferPanel offer,
+                                     PlayerTradeResponsePanel response,
+                                     PlayerTradeSelectPanel select) {
+        this.tradeOfferPanel    = offer;
+        this.tradeResponsePanel = response;
+        this.tradeSelectPanel   = select;
+
+        offer.setOnPropose(this::submitPlayerOffer);
+        offer.setOnCancel(this::cancelPlayerTrade);
+        response.setOnRespond(this::recordTradeResponse);
+        select.setOnExecute(this::executePlayerTrade);
+        select.setOnCancel(this::cancelPlayerTrade);
+    }
+
+    public void openPlayerTrade() {
+        if (turnManager.getPhase() != GamePhase.BUILD) return;
+        if (tradingPanel != null) tradingPanel.reset();
+        if (tradeOfferPanel != null) tradeOfferPanel.show(turnManager.getCurrentPlayer());
+    }
+
+    private void submitPlayerOffer(Map<ResourceType, Integer> offering,
+                                   Map<ResourceType, Integer> requesting) {
+        Player proposer = turnManager.getCurrentPlayer();
+        pendingOffer = new PlayerTradeOffer(proposer, offering, requesting);
+        if (!pendingOffer.isValidOffer()) return;
+
+        tradeOfferPanel.hide();
+        tradeResponders   = playerList.getAll().stream().filter(p -> p != proposer).toList();
+        tradeResponderIdx = 0;
+        advanceTradeResponse();
+    }
+
+    private void advanceTradeResponse() {
+        if (tradeResponderIdx >= tradeResponders.size()) {
+            tradeResponsePanel.hide();
+            List<Player> acceptors = pendingOffer.getAcceptors();
+            if (acceptors.isEmpty()) {
+                log(LogEntry.plain("No one accepted the trade offer.", Color.web("#888888")));
+                pendingOffer  = null;
+                tradeResponders = null;
+            } else {
+                tradeSelectPanel.show(pendingOffer, acceptors);
+            }
+            return;
+        }
+        tradeResponsePanel.show(pendingOffer, tradeResponders.get(tradeResponderIdx));
+    }
+
+    private void recordTradeResponse(Player player, PlayerTradeOffer.Response response) {
+        pendingOffer.respond(player, response);
+        tradeResponderIdx++;
+        advanceTradeResponse();
+    }
+
+    private void executePlayerTrade(Player acceptor) {
+        Player proposer = pendingOffer.getProposer();
+        pendingOffer.execute(acceptor);
+
+        // Log offering and requesting sides
+        List<LogEntry.Segment> segs = new ArrayList<>();
+        segs.add(seg(proposer.getName(), logColor(proposer)));
+        segs.add(seg(" traded with ", Color.web("#444444")));
+        segs.add(seg(acceptor.getName(), logColor(acceptor)));
+        EventBus.getInstance().publish(GameEvent.LOG_MESSAGE, new LogEntry(segs));
+
+        tradeSelectPanel.hide();
+        pendingOffer    = null;
+        tradeResponders = null;
+        updateDashboard();
+    }
+
+    private void cancelPlayerTrade() {
+        if (tradeOfferPanel    != null) tradeOfferPanel.hide();
+        if (tradeResponsePanel != null) tradeResponsePanel.hide();
+        if (tradeSelectPanel   != null) tradeSelectPanel.hide();
+        pendingOffer    = null;
+        tradeResponders = null;
     }
 
     public void setBuildButtons(Button road, Button settlement, Button city) {

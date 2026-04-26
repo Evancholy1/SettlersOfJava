@@ -21,6 +21,9 @@ import javafx.scene.text.Font;
 import settlersofjava.engine.CatanGame;
 import settlersofjava.ui.DiceView;
 import settlersofjava.ui.GameLogPanel;
+import settlersofjava.ui.PlayerTradeOfferPanel;
+import settlersofjava.ui.PlayerTradeResponsePanel;
+import settlersofjava.ui.PlayerTradeSelectPanel;
 import settlersofjava.ui.TradingPanel;
 
 import java.util.List;
@@ -114,7 +117,11 @@ public class SettlersApp extends Application {
             testButton.setFont(new Font(14));
             testButton.setStyle("-fx-background-color: #ff6b6b; -fx-text-fill: white; -fx-font-weight: bold;");
 
-            HBox buildBar = new HBox(12, buildRoadButton, buildSettlementButton, buildCityButton, testButton);
+            Button tradeButton = new Button("Trade w/ Players");
+            tradeButton.setFont(new Font(14));
+            tradeButton.setStyle("-fx-background-color: #1976D2; -fx-text-fill: white; -fx-font-weight: bold;");
+
+            HBox buildBar = new HBox(12, buildRoadButton, buildSettlementButton, buildCityButton, tradeButton, testButton);
             buildBar.setAlignment(Pos.CENTER_LEFT);
             buildBar.setPadding(new Insets(4, 20, 8, 20));
 
@@ -122,6 +129,9 @@ public class SettlersApp extends Application {
 
             PlayerDashboard dashboard = new PlayerDashboard();
             TradingPanel tradingPanel = new TradingPanel();
+            PlayerTradeOfferPanel tradeOfferPanel       = new PlayerTradeOfferPanel();
+            PlayerTradeResponsePanel tradeResponsePanel = new PlayerTradeResponsePanel();
+            PlayerTradeSelectPanel tradeSelectPanel     = new PlayerTradeSelectPanel();
 
             DiceView diceView = new DiceView();
             diceView.setMouseTransparent(true); // dice are display-only; don't block board clicks
@@ -133,7 +143,7 @@ public class SettlersApp extends Application {
             gameLayout.setStyle("-fx-background-color: #1565C0;");
             gameLayout.setTop(topArea);
             gameLayout.setCenter(boardStack);
-            gameLayout.setBottom(new VBox(tradingPanel, dashboard));
+            gameLayout.setBottom(new VBox(tradingPanel, tradeOfferPanel, tradeResponsePanel, tradeSelectPanel, dashboard));
             gameLayout.setRight(new GameLogPanel());
 
             GameController controller = new GameController(
@@ -145,6 +155,7 @@ public class SettlersApp extends Application {
             controller.setBoardView(boardView);
             controller.setPlayerDashboard(dashboard);
             controller.setTradingPanel(tradingPanel);
+            controller.setPlayerTradePanels(tradeOfferPanel, tradeResponsePanel, tradeSelectPanel);
 
             testButton.setOnAction(ev -> {
                 settlersofjava.player.Player current = game.getTurnManager().getCurrentPlayer();
@@ -152,7 +163,8 @@ public class SettlersApp extends Application {
                     current.addResource(t, 10);
             });
 
-            rollButton.setOnAction(ev           -> controller.rollDice());
+            tradeButton.setOnAction(ev           -> controller.openPlayerTrade());
+            rollButton.setOnAction(ev            -> controller.rollDice());
             endTurnButton.setOnAction(ev        -> controller.endTurn());
             buildRoadButton.setOnAction(ev      -> controller.toggleBuildRoad());
             buildSettlementButton.setOnAction(ev -> controller.toggleBuildSettlement());
