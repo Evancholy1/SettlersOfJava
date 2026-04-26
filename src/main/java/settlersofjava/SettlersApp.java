@@ -119,15 +119,11 @@ public class SettlersApp extends Application {
             topBar.setAlignment(Pos.CENTER_LEFT);
             topBar.setPadding(new Insets(8, 20, 4, 20));
 
-            Button testButton = new Button("TEST");
-            testButton.setFont(new Font(14));
-            testButton.setStyle("-fx-background-color: #ff6b6b; -fx-text-fill: white; -fx-font-weight: bold;");
-
             Button tradeButton = new Button("Trade w/ Players");
             tradeButton.setFont(new Font(14));
             tradeButton.setStyle("-fx-background-color: #1976D2; -fx-text-fill: white; -fx-font-weight: bold;");
 
-            HBox buildBar = new HBox(12, buildRoadButton, buildSettlementButton, buildCityButton, buildDevCardButton, tradeButton, testButton);
+            HBox buildBar = new HBox(12, buildRoadButton, buildSettlementButton, buildCityButton, buildDevCardButton, tradeButton);
             buildBar.setAlignment(Pos.CENTER_LEFT);
             buildBar.setPadding(new Insets(4, 20, 8, 20));
 
@@ -159,16 +155,11 @@ public class SettlersApp extends Application {
                     statusLabel::setText,
                     deck
             );
+            controller.setGameLayout(gameLayout);
             controller.setBoardView(boardView);
             controller.setPlayerDashboard(dashboard);
             controller.setTradingPanel(tradingPanel);
             controller.setPlayerTradePanels(tradeOfferPanel, tradeResponsePanel, tradeSelectPanel);
-
-            testButton.setOnAction(ev -> {
-                settlersofjava.player.Player current = game.getTurnManager().getCurrentPlayer();
-                for (settlersofjava.resources.ResourceType t : settlersofjava.resources.ResourceType.values())
-                    current.addResource(t, 10);
-            });
 
             tradeButton.setOnAction(ev           -> controller.openPlayerTrade());
             rollButton.setOnAction(ev            -> controller.rollDice());

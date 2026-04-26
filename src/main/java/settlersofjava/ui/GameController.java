@@ -22,6 +22,7 @@ import settlersofjava.resources.ResourceType;
 
 import javafx.collections.MapChangeListener;
 import javafx.scene.paint.Color;
+import javafx.scene.layout.BorderPane;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -53,6 +54,8 @@ public class GameController implements GameEventListener {
     private BoardView       boardView;
     private PlayerDashboard playerDashboard;
     private TradingPanel    tradingPanel;
+    private BorderPane gameLayout;
+    private boolean isGameOver = false;
 
     // ── Dev cards ─────────────────────────────────────────────────────────────
     private final List<DevelopmentCard> devCardDeck;
@@ -233,6 +236,10 @@ public class GameController implements GameEventListener {
         updateBuildButtons();
     }
 
+    public void setGameLayout(BorderPane layout) {
+        this.gameLayout = layout;
+    }
+
     // ── Public build-mode toggles (called from SettlersApp button actions) ────
 
     public void toggleBuildRoad()       { toggle(BuildMode.ROAD); }
@@ -332,6 +339,7 @@ public class GameController implements GameEventListener {
                 p.addVictoryPoints(1);
                 log(seg(p.getName(), logColor(p)), seg(" built a Settlement", Color.web("#444444")));
                 afterBuild();
+                checkWinCondition(p);
             }
             case CITY -> {
                 if (!isValidCityUpgrade(v)) return;
@@ -340,6 +348,7 @@ public class GameController implements GameEventListener {
                 p.addVictoryPoints(1);
                 log(seg(p.getName(), logColor(p)), seg(" upgraded to a City", Color.web("#444444")));
                 afterBuild();
+                checkWinCondition(p);
             }
             default -> {}
         }
@@ -376,6 +385,7 @@ public class GameController implements GameEventListener {
         updateHighlights();
         updateBuildButtons();
         updateStatus();
+        updateDashboard();
     }
 
     // ── Validation ────────────────────────────────────────────────────────────
@@ -639,11 +649,11 @@ public class GameController implements GameEventListener {
 
     private void updateActionButtons() {
         if (rollButton    != null) rollButton.setDisable(turnManager.getPhase() != GamePhase.ROLL);
-        if (endTurnButton != null) endTurnButton.setDisable(turnManager.getPhase() != GamePhase.BUILD);
+        if (endTurnButton != null) endTurnButton.setDisable(turnManager.getPhase() != GamePhase.BUILD || robberMode);
     }
 
     private void updateBuildButtons() {
-        boolean isBuild = turnManager.getPhase() == GamePhase.BUILD;
+        boolean isBuild = turnManager.getPhase() == GamePhase.BUILD && !robberMode;
         Player  p       = turnManager.getCurrentPlayer();
         setBuildBtn(buildRoadButton,       BuildMode.ROAD,       isBuild && p.canAfford(Road.COST));
         setBuildBtn(buildSettlementButton, BuildMode.SETTLEMENT, isBuild && p.canAfford(Settlement.COST));
@@ -712,6 +722,8 @@ public class GameController implements GameEventListener {
                 }
             }
             robberMode = true;
+            turnManager.advancePhase(); // ROLL → TRADE
+            turnManager.advancePhase(); // TRADE → BUILD
             updateHighlights();
             updateActionButtons();
             updateBuildButtons();
@@ -757,12 +769,6 @@ public class GameController implements GameEventListener {
         }
 
         robberMode = false;
-        if (turnManager.getPhase() == GamePhase.ROLL) {
-            turnManager.advancePhase(); // ROLL → TRADE
-            turnManager.advancePhase(); // TRADE → BUILD
-        }
-        turnManager.advancePhase(); // ROLL → TRADE
-        turnManager.advancePhase(); // TRADE → BUILD
         updateHighlights();
         updateActionButtons();
         updateBuildButtons();
@@ -806,7 +812,21 @@ public class GameController implements GameEventListener {
     }
 
     private void handleGameOver(Object payload) {
-        // TODO: show winner dialog
+        if (payload instanceof Player winner) {
+            if (gameLayout != null) {
+                gameLayout.setCenter(new GameOverPanel(winner, playerList.getAll()));
+                gameLayout.setTop(null);
+                gameLayout.setBottom(null);
+            }
+
+            log(LogEntry.plain("=================================", Color.FIREBRICK));
+            log(seg("GAME OVER! ", Color.FIREBRICK),
+                    seg(winner.getName() + " wins with " + winner.getTotalVictoryPoints() + " VPs!", logColor(winner)));
+
+            if (statusUpdater != null) {
+                statusUpdater.accept("Game Over! " + winner.getName() + " has won the game.");
+            }
+        }
     }
 
     public void purchaseDevCard() {
@@ -830,6 +850,8 @@ public class GameController implements GameEventListener {
         log(seg(p.getName(), logColor(p)), seg(" bought a Development Card.", Color.web("#444444")));
         updateBuildButtons();
         updateDashboard();
+
+        checkWinCondition(p);
     }
 
     private void playDevCard(settlersofjava.cards.DevelopmentCard card) {
@@ -880,7 +902,18 @@ public class GameController implements GameEventListener {
                 p.setHasLargestArmy(true);
                 log(seg(p.getName(), logColor(p)),
                         seg(" took the Largest Army! (+2 VP)", Color.web("#B8860B")));
+                updateDashboard();
+                checkWinCondition(p);
             }
+        }
+    }
+
+    private void checkWinCondition(Player p) {
+        if (isGameOver) return;
+
+        if (p.getTotalVictoryPoints() >= 10) {
+            isGameOver = true;
+            EventBus.getInstance().publish(GameEvent.GAME_OVER, p);
         }
     }
 
