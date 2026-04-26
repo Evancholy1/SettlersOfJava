@@ -53,7 +53,9 @@ public class GameController implements GameEventListener {
 
     private BoardView       boardView;
     private PlayerDashboard playerDashboard;
-    private TradingPanel    tradingPanel;
+    private TradingPanel         tradingPanel;
+    private MonopolyPickerPanel      monopolyPickerPanel;
+    private YearOfPlentyPickerPanel  yearOfPlentyPickerPanel;
     private BorderPane gameLayout;
     private boolean isGameOver = false;
 
@@ -144,6 +146,16 @@ public class GameController implements GameEventListener {
         panel.setOnBankTrade(this::executeBankTrade);
         panel.setOnPropose(this::submitPlayerOffer);
         panel.setOnCancel(() -> {});
+    }
+
+    public void setMonopolyPickerPanel(MonopolyPickerPanel panel) {
+        this.monopolyPickerPanel = panel;
+        panel.setOnPick(this::executeMonopoly);
+    }
+
+    public void setYearOfPlentyPickerPanel(YearOfPlentyPickerPanel panel) {
+        this.yearOfPlentyPickerPanel = panel;
+        panel.setOnClaim(this::executeYearOfPlenty);
     }
 
     public void setPlayerTradePanels(PlayerTradeResponsePanel response,
@@ -898,8 +910,49 @@ public class GameController implements GameEventListener {
             updateHighlights();
             updateBuildButtons();
             statusUpdater.accept(p.getName() + " played Road Building — place 2 free roads.");
+        } else if (card instanceof settlersofjava.cards.MonopolyCard) {
+            p.removeDevCard(card);
+            if (monopolyPickerPanel != null) monopolyPickerPanel.show();
+            statusUpdater.accept(p.getName() + " played Monopoly — pick a resource to claim!");
+        } else if (card instanceof settlersofjava.cards.YearOfPlentyCard) {
+            p.removeDevCard(card);
+            if (yearOfPlentyPickerPanel != null) yearOfPlentyPickerPanel.show();
+            statusUpdater.accept(p.getName() + " played Year of Plenty — pick 2 free resources!");
         }
 
+        updateDashboard();
+    }
+
+    private void executeMonopoly(ResourceType type) {
+        if (monopolyPickerPanel != null) monopolyPickerPanel.hide();
+        Player current = turnManager.getCurrentPlayer();
+        int total = 0;
+        for (Player p : playerList.getAll()) {
+            if (p == current) continue;
+            int amount = p.getResource(type);
+            if (amount > 0) {
+                p.removeResource(type, amount);
+                current.addResource(type, amount);
+                total += amount;
+            }
+        }
+        log(seg(current.getName(), logColor(current)),
+            seg(" monopolized ", Color.web("#444444")),
+            seg(capitalize(type.name().toLowerCase()), resourceColor(type)),
+            seg(" — claimed " + total + " card" + (total == 1 ? "" : "s") + "!", Color.web("#B8860B")));
+        updateDashboard();
+    }
+
+    private void executeYearOfPlenty(ResourceType a, ResourceType b) {
+        Player current = turnManager.getCurrentPlayer();
+        current.addResource(a, 1);
+        current.addResource(b, 1);
+        log(seg(current.getName(), logColor(current)),
+            seg(" used Year of Plenty — gained 1 ", Color.web("#444444")),
+            seg(capitalize(a.name().toLowerCase()), resourceColor(a)),
+            seg(" and 1 ", Color.web("#444444")),
+            seg(capitalize(b.name().toLowerCase()), resourceColor(b)),
+            seg("!", Color.web("#B8860B")));
         updateDashboard();
     }
 

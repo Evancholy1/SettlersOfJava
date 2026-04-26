@@ -25,6 +25,8 @@ import settlersofjava.ui.DiceView;
 import settlersofjava.ui.GameLogPanel;
 import settlersofjava.ui.PlayerTradeResponsePanel;
 import settlersofjava.ui.PlayerTradeSelectPanel;
+import settlersofjava.ui.MonopolyPickerPanel;
+import settlersofjava.ui.YearOfPlentyPickerPanel;
 import settlersofjava.ui.TradingPanel;
 
 import java.util.List;
@@ -151,16 +153,7 @@ public class SettlersApp extends Application {
             topBar.setAlignment(Pos.CENTER_LEFT);
             topBar.setPadding(new Insets(8, 20, 4, 20));
 
-            Button testButton = new Button("TEST");
-            testButton.setFont(new Font(14));
-            testButton.setStyle("-fx-background-color: #ff6b6b; -fx-text-fill: white; -fx-font-weight: bold;");
-            testButton.setOnAction(ev -> {
-                settlersofjava.player.Player current = game.getTurnManager().getCurrentPlayer();
-                for (settlersofjava.resources.ResourceType t : settlersofjava.resources.ResourceType.values())
-                    current.addResource(t, 10);
-            });
-
-            HBox buildBar = new HBox(12, buildRoadButton, buildSettlementButton, buildCityButton, buildDevCardButton, testButton);
+            HBox buildBar = new HBox(12, buildRoadButton, buildSettlementButton, buildCityButton, buildDevCardButton);
             buildBar.setAlignment(Pos.CENTER_LEFT);
             buildBar.setPadding(new Insets(4, 20, 8, 20));
 
@@ -170,6 +163,8 @@ public class SettlersApp extends Application {
             TradingPanel tradingPanel = new TradingPanel();
             PlayerTradeResponsePanel tradeResponsePanel = new PlayerTradeResponsePanel();
             PlayerTradeSelectPanel tradeSelectPanel     = new PlayerTradeSelectPanel();
+            MonopolyPickerPanel monopolyPickerPanel         = new MonopolyPickerPanel();
+            YearOfPlentyPickerPanel yearOfPlentyPickerPanel = new YearOfPlentyPickerPanel();
 
             DiceView diceView = new DiceView();
             diceView.setMouseTransparent(true); // dice are display-only; don't block board clicks
@@ -181,7 +176,7 @@ public class SettlersApp extends Application {
             gameLayout.setStyle("-fx-background-color: #1565C0;");
             gameLayout.setTop(topArea);
             gameLayout.setCenter(boardStack);
-            gameLayout.setBottom(new VBox(tradingPanel, tradeResponsePanel, tradeSelectPanel, dashboard));
+            gameLayout.setBottom(new VBox(tradingPanel, tradeResponsePanel, tradeSelectPanel, monopolyPickerPanel, yearOfPlentyPickerPanel, dashboard));
             gameLayout.setRight(new GameLogPanel());
 
             GameController controller = new GameController(
@@ -196,6 +191,8 @@ public class SettlersApp extends Application {
             controller.setPlayerDashboard(dashboard);
             controller.setTradingPanel(tradingPanel);
             controller.setPlayerTradePanels(tradeResponsePanel, tradeSelectPanel);
+            controller.setMonopolyPickerPanel(monopolyPickerPanel);
+            controller.setYearOfPlentyPickerPanel(yearOfPlentyPickerPanel);
 
             rollButton.setOnAction(ev            -> controller.rollDice());
             endTurnButton.setOnAction(ev        -> controller.endTurn());

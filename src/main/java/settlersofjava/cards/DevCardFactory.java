@@ -15,6 +15,8 @@ public class DevCardFactory {
         for (int i = 0; i < 14; i++) deck.add(new KnightCard());
         for (int i = 0; i < 5;  i++) deck.add(new VictoryPointCard());
         for (int i = 0; i < 2;  i++) deck.add(new RoadBuildingCard());
+        for (int i = 0; i < 2;  i++) deck.add(new MonopolyCard());
+        for (int i = 0; i < 2;  i++) deck.add(new YearOfPlentyCard());
         Collections.shuffle(deck);
         return deck;
     }
