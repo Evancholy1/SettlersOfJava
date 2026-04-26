@@ -54,8 +54,13 @@ public class GameController implements GameEventListener {
     private PlayerDashboard playerDashboard;
     private TradingPanel    tradingPanel;
 
+    // ── Dev cards ─────────────────────────────────────────────────────────────
     private final List<DevelopmentCard> devCardDeck;
     private boolean devCardPlayedThisTurn = false;
+
+    // ── Largest Army ──────────────────────────────────────────────────────────
+    private Player largestArmyOwner = null;
+    private int largestArmySize = 2;
 
     // ── Player trade panels + state ───────────────────────────────────────────
     private PlayerTradeOfferPanel    tradeOfferPanel;
@@ -752,6 +757,10 @@ public class GameController implements GameEventListener {
         }
 
         robberMode = false;
+        if (turnManager.getPhase() == GamePhase.ROLL) {
+            turnManager.advancePhase(); // ROLL → TRADE
+            turnManager.advancePhase(); // TRADE → BUILD
+        }
         turnManager.advancePhase(); // ROLL → TRADE
         turnManager.advancePhase(); // TRADE → BUILD
         updateHighlights();
@@ -839,6 +848,8 @@ public class GameController implements GameEventListener {
         log(seg(p.getName(), logColor(p)), seg(" played ", Color.web("#444444")), seg(card.getCardName(), Color.web("#B8860B")));
 
         if (card instanceof settlersofjava.cards.KnightCard) {
+            p.incrementArmySize();
+            checkLargestArmy(p);
             robberMode = true;
             updateHighlights();
             updateActionButtons();
@@ -854,6 +865,23 @@ public class GameController implements GameEventListener {
         }
 
         updateDashboard();
+    }
+
+    private void checkLargestArmy(Player p) {
+        if (p.getArmySize() > largestArmySize) {
+            largestArmySize = p.getArmySize();
+            if (largestArmyOwner != p) {
+                if (largestArmyOwner != null) {
+                    largestArmyOwner.setHasLargestArmy(false);
+                    log(seg(largestArmyOwner.getName(), logColor(largestArmyOwner)),
+                            seg(" lost the Largest Army.", Color.web("#888888")));
+                }
+                largestArmyOwner = p;
+                p.setHasLargestArmy(true);
+                log(seg(p.getName(), logColor(p)),
+                        seg(" took the Largest Army! (+2 VP)", Color.web("#B8860B")));
+            }
+        }
     }
 
     // ── Log helpers ───────────────────────────────────────────────────────────

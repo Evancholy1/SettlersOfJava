@@ -33,6 +33,7 @@ public class PlayerDashboard extends HBox {
     private final HBox    cardsBox;
     private final HBox    devCardsBox;
     private java.util.function.Consumer<settlersofjava.cards.DevelopmentCard> onDevCardPlay;
+    private final Label vpLabel;
 
     private Consumer<ResourceType> onResourceCardClick;
 
@@ -56,7 +57,11 @@ public class PlayerDashboard extends HBox {
         nameLabel = new Label("—");
         nameLabel.setFont(Font.font("System", FontWeight.BOLD, 13));
 
-        VBox playerInfo = new VBox(6, icon, nameLabel);
+        vpLabel = new Label("Total VPs: 0");
+        vpLabel.setFont(Font.font("System", FontWeight.BOLD, 14));
+        vpLabel.setTextFill(Color.web("#B8860B")); // Gold/Yellow color for VPs
+
+        VBox playerInfo = new VBox(6, vpLabel, icon, nameLabel);
         playerInfo.setAlignment(Pos.CENTER);
 
         // ── Resource cards ────────────────────────────────────────────────────
@@ -87,6 +92,7 @@ public class PlayerDashboard extends HBox {
         iconCircle.setFill(BoardView.playerColor(player.getColor()));
         iconInitial.setText(String.valueOf(player.getName().charAt(0)).toUpperCase());
         nameLabel.setText(player.getName());
+        vpLabel.setText("Total VPs: " + player.getTotalVictoryPoints());
 
         cardsBox.getChildren().clear();
         for (ResourceType type : ResourceType.values()) {

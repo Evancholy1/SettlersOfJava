@@ -1,5 +1,6 @@
 package settlersofjava.player;
 
+import javafx.beans.property.SimpleBooleanProperty;
 import settlersofjava.resources.ResourceBundle;
 import settlersofjava.resources.ResourceType;
 import javafx.beans.property.IntegerProperty;
@@ -26,6 +27,7 @@ public class Player {
     private final IntegerProperty victoryPoints;
     private final IntegerProperty armySize;
     private final javafx.collections.ObservableList<DevelopmentCard> devCards;
+    private final javafx.beans.property.BooleanProperty hasLargestArmy;
 
     public Player(String name, PlayerColor color) {
         this.name = name;
@@ -34,6 +36,7 @@ public class Player {
         this.victoryPoints = new SimpleIntegerProperty(0);
         this.armySize = new SimpleIntegerProperty(0);
         this.devCards = FXCollections.observableArrayList();
+        this.hasLargestArmy = new SimpleBooleanProperty(false);
 
         // Initialize all resource counts to 0
         for (ResourceType type : ResourceType.values()) {
@@ -82,6 +85,10 @@ public class Player {
     public int getArmySize()                       { return armySize.get(); }
     public void incrementArmySize()                { armySize.set(armySize.get() + 1); }
 
+    public javafx.beans.property.BooleanProperty hasLargestArmyProperty() { return hasLargestArmy; }
+    public boolean hasLargestArmy() { return hasLargestArmy.get(); }
+    public void setHasLargestArmy(boolean value) { hasLargestArmy.set(value); }
+
     // ── Basic getters ─────────────────────────────────────────────────────────
 
     public String getName()       { return name; }
@@ -100,6 +107,24 @@ public class Player {
 
     public void unlockDevCards() {
         for (DevelopmentCard card : devCards) card.unlock();
+    }
+
+    public int getTotalVictoryPoints() {
+        int total = getVictoryPoints(); // Public VPs from Settlements and Cities
+
+        // Add hidden Victory Point cards
+        for (settlersofjava.cards.DevelopmentCard card : getDevCards()) {
+            if (card instanceof settlersofjava.cards.VictoryPointCard) {
+                total++;
+            }
+        }
+
+        // Add +2 if they hold the Largest Army
+        if (hasLargestArmy()) {
+            total += 2;
+        }
+
+        return total;
     }
 }
 
