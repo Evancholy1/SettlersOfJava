@@ -151,7 +151,16 @@ public class SettlersApp extends Application {
             topBar.setAlignment(Pos.CENTER_LEFT);
             topBar.setPadding(new Insets(8, 20, 4, 20));
 
-            HBox buildBar = new HBox(12, buildRoadButton, buildSettlementButton, buildCityButton, buildDevCardButton);
+            Button testButton = new Button("TEST");
+            testButton.setFont(new Font(14));
+            testButton.setStyle("-fx-background-color: #ff6b6b; -fx-text-fill: white; -fx-font-weight: bold;");
+            testButton.setOnAction(ev -> {
+                settlersofjava.player.Player current = game.getTurnManager().getCurrentPlayer();
+                for (settlersofjava.resources.ResourceType t : settlersofjava.resources.ResourceType.values())
+                    current.addResource(t, 10);
+            });
+
+            HBox buildBar = new HBox(12, buildRoadButton, buildSettlementButton, buildCityButton, buildDevCardButton, testButton);
             buildBar.setAlignment(Pos.CENTER_LEFT);
             buildBar.setPadding(new Insets(4, 20, 8, 20));
 

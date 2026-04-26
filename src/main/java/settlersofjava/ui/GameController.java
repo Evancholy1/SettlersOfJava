@@ -65,6 +65,10 @@ public class GameController implements GameEventListener {
     private Player largestArmyOwner = null;
     private int largestArmySize = 2;
 
+    // ── Longest Road ──────────────────────────────────────────────────────────
+    private Player longestRoadOwner = null;
+    private int longestRoadLength = 4;
+
     // ── Player trade panels + state ───────────────────────────────────────────
     private PlayerTradeResponsePanel tradeResponsePanel;
     private PlayerTradeSelectPanel   tradeSelectPanel;
@@ -323,6 +327,7 @@ public class GameController implements GameEventListener {
         Player current = turnManager.getCurrentPlayer();
         e.placeRoad(new Road(current));
         log(seg(current.getName(), logColor(current)), seg(" placed a Road", Color.web("#444444")));
+        checkLongestRoad(current);
 
         setupSubPhase = SetupSubPhase.PLACE_SETTLEMENT;
         lastPlacedSettlement = null;
@@ -369,6 +374,7 @@ public class GameController implements GameEventListener {
             spend(Road.COST, p);
             e.placeRoad(new Road(p));
             log(seg(p.getName(), logColor(p)), seg(" built a Road", Color.web("#444444")));
+            checkLongestRoad(p);
             afterBuild();
 
         } else if (buildMode == BuildMode.ROAD_BUILDING_CARD) {
@@ -376,6 +382,7 @@ public class GameController implements GameEventListener {
             e.placeRoad(new Road(p));
             freeRoadsLeft--;
             log(seg(p.getName(), logColor(p)), seg(" placed a free Road", Color.web("#444444")));
+            checkLongestRoad(p);
 
             if (freeRoadsLeft <= 0) {
                 buildMode = BuildMode.NONE;
@@ -909,6 +916,26 @@ public class GameController implements GameEventListener {
                 p.setHasLargestArmy(true);
                 log(seg(p.getName(), logColor(p)),
                         seg(" took the Largest Army! (+2 VP)", Color.web("#B8860B")));
+                updateDashboard();
+                checkWinCondition(p);
+            }
+        }
+    }
+
+    private void checkLongestRoad(Player p) {
+        int length = LongestRoadCalculator.compute(p, boardState.getVertices(), boardState.getEdges());
+        if (length >= 5 && length > longestRoadLength) {
+            longestRoadLength = length;
+            if (longestRoadOwner != p) {
+                if (longestRoadOwner != null) {
+                    longestRoadOwner.setHasLongestRoad(false);
+                    log(seg(longestRoadOwner.getName(), logColor(longestRoadOwner)),
+                            seg(" lost the Longest Road.", Color.web("#888888")));
+                }
+                longestRoadOwner = p;
+                p.setHasLongestRoad(true);
+                log(seg(p.getName(), logColor(p)),
+                        seg(" took the Longest Road! (+2 VP)", Color.web("#B8860B")));
                 updateDashboard();
                 checkWinCondition(p);
             }

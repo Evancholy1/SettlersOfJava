@@ -28,6 +28,7 @@ public class Player {
     private final IntegerProperty armySize;
     private final javafx.collections.ObservableList<DevelopmentCard> devCards;
     private final javafx.beans.property.BooleanProperty hasLargestArmy;
+    private final javafx.beans.property.BooleanProperty hasLongestRoad;
 
     public Player(String name, PlayerColor color) {
         this.name = name;
@@ -37,6 +38,7 @@ public class Player {
         this.armySize = new SimpleIntegerProperty(0);
         this.devCards = FXCollections.observableArrayList();
         this.hasLargestArmy = new SimpleBooleanProperty(false);
+        this.hasLongestRoad = new SimpleBooleanProperty(false);
 
         // Initialize all resource counts to 0
         for (ResourceType type : ResourceType.values()) {
@@ -89,6 +91,10 @@ public class Player {
     public boolean hasLargestArmy() { return hasLargestArmy.get(); }
     public void setHasLargestArmy(boolean value) { hasLargestArmy.set(value); }
 
+    public javafx.beans.property.BooleanProperty hasLongestRoadProperty() { return hasLongestRoad; }
+    public boolean hasLongestRoad() { return hasLongestRoad.get(); }
+    public void setHasLongestRoad(boolean value) { hasLongestRoad.set(value); }
+
     // ── Basic getters ─────────────────────────────────────────────────────────
 
     public String getName()       { return name; }
@@ -119,10 +125,8 @@ public class Player {
             }
         }
 
-        // Add +2 if they hold the Largest Army
-        if (hasLargestArmy()) {
-            total += 2;
-        }
+        if (hasLargestArmy()) total += 2;
+        if (hasLongestRoad())  total += 2;
 
         return total;
     }
