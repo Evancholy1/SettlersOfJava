@@ -42,7 +42,6 @@ public class SettlersApp extends Application {
 
     @Override
     public void start(Stage primaryStage) {
-        // TODO: load main.fxml, inject BoardState + PlayerList into GameController
         Scene setupScene = createSetupScene(primaryStage);
 
         // Show Setup Screen

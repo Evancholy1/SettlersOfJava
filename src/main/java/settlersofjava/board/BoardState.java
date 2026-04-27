@@ -2,7 +2,6 @@ package settlersofjava.board;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 /**
  * PATTERN: Dependency Injection (injected into GameController)
@@ -92,11 +91,6 @@ public class BoardState {
         return edges.stream()
                 .filter(e -> e.connectsVertex(v))
                 .toList();
-    }
-
-    /** Returns the port at the given vertex, if any. */
-    public Optional<PortType> getPortFor(Vertex v) {
-        return Optional.ofNullable(v.getPort());
     }
 }
 

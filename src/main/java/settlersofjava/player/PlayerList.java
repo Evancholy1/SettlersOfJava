@@ -21,11 +21,5 @@ public class PlayerList {
     public int size()                  { return players.size(); }
     public List<Player> getAll()       { return players; }
 
-    public Player getWinner() {
-        return players.stream()
-                .filter(p -> p.getVictoryPoints() >= 10)
-                .findFirst()
-                .orElse(null);
-    }
 }
 
